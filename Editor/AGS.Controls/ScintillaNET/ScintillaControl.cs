@@ -70,8 +70,13 @@ namespace Scintilla
             SetMarginSensitivity(2, 1);
 
 
-            
 
+
+        }
+
+        public void SetIndentationGuides(int flag)
+        {
+            this.SendMessageDirect(Constants.SCI_SETINDENTATIONGUIDES, flag);
         }
 
         private bool isNumeric(char token)
