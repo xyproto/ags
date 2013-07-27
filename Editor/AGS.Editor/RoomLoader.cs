@@ -23,20 +23,14 @@ namespace AGS.Editor
         private static InteractionSchema _interactionSchema;
         private List<RoomBackground> _backgrounds = new List<RoomBackground>();
         private Bitmap _hotspotMask;
-        private int _hotspotCount; // TODO: phase out these superfluous variables
         private List<RoomHotspot> _hotspots = new List<RoomHotspot>();
-        private int _objectCount;
         private List<RoomObject> _objects = new List<RoomObject>();
         private Bitmap _regionMask;
-        private int _regionCount;
         private List<RoomRegion> _regions = new List<RoomRegion>();
         private Bitmap _walkableAreaMask;
-        private int _walkableAreaCount;
         private List<RoomWalkableArea> _walkableAreas = new List<RoomWalkableArea>();
         private Bitmap _walkBehindMask;
-        private int _walkBehindCount;
         private List<RoomWalkBehind> _walkBehinds = new List<RoomWalkBehind>();
-        private int _messageCount;
         private List<string> _messages = new List<string>();
         private List<MessageInfo> _messageInfos = new List<MessageInfo>();
         private RoomFileVersion _loadedVersion;
@@ -55,6 +49,11 @@ namespace AGS.Editor
         private int[] _options = new int[10];
         private int _gameID;
         private List<Color> _palette = new List<Color>();
+        private int _backgroundAnimationSpeed;
+        private bool _compiledScriptShared;
+        private int _compiledScriptSize;
+        private CompiledScript _compiledScript;
+        private string _textScript;
 
         static RoomLoader()
         {
@@ -88,10 +87,29 @@ namespace AGS.Editor
 
         public class RoomBackground
         {
+            public const int PALETTE_SIZE = 256;
+
             public Bitmap Graphic
             {
                 get;
                 set;
+            }
+
+            public List<Color> Palette
+            {
+                get;
+                set;
+            }
+
+            public bool PaletteShared
+            {
+                get;
+                set;
+            }
+
+            public RoomBackground()
+            {
+                Palette = new List<Color>(PALETTE_SIZE);
             }
         }
 
@@ -103,6 +121,11 @@ namespace AGS.Editor
             UnexpectedEOF,
             OldBlockNotSupported,
             UnknownBlockType,
+            InconsistentDataForObjectNames,
+            ScriptLoadFailed,
+            PropertiesFormatNotSupported,
+            PropertiesLoadFailed,
+            InconsistentDataForObjectScriptNames
         };
 
         enum RoomFileVersion
@@ -150,47 +173,36 @@ namespace AGS.Editor
 
         private void InitializeDefaults()
         {
+            const int NO_GAME_ID_IN_ROOM_FILE = 16325;
             _loadedVersion = RoomFileVersion.Current;
             _backgrounds.Clear();
             _backgrounds.Add(new RoomBackground());
+            _gameID = NO_GAME_ID_IN_ROOM_FILE;
+            _width = 320;
+            _height = 200;
+            _edgeLeft = 0;
+            _edgeRight = 317;
+            _edgeTop = 40;
+            _edgeBottom = 199;
+            _resolution = RoomResolution.LowRes;
+            _bpp = 1;
+            _hotspots.Clear();
+            _objects.Clear();
+            _regions.Clear();
+            _walkableAreas.Clear();
+            _walkBehinds.Clear();
+            _backgrounds.Clear();
+            _backgrounds.Add(new RoomBackground());
+            _localVariables.Clear();
+            _messages.Clear();
+            _messageInfos.Clear();
+            _palette.Clear();
+            _stateSaving = true;
+            Array.Clear(_options, 0, _options.Length);
+            _backgroundAnimationSpeed = 5;
+            _compiledScriptShared = false;
+            _compiledScriptSize = 0;
         }
-
-        /**\
-         * void RoomInfo::InitDefaults()
-{
-    LoadedVersion = kRoomVersion_Current;
-    GameId = NO_GAME_ID_IN_ROOM_FILE;
-
-    Width           = 320;
-    Height          = 200;
-    Edges.Left      = 0;
-    Edges.Right     = 317;
-    Edges.Top       = 40;
-    Edges.Bottom    = 199;
-    Resolution      = 1;
-    BytesPerPixel   = 1;
-
-    HotspotCount    = 0;
-    ObjectCount     = 0;
-    RegionCount     = 0;
-    WalkAreaCount   = 0;
-    WalkBehindCount = 0;
-    BkgSceneCount   = 1;
-    LocalVariableCount = 0;
-    MessageCount    = 0;
-    AnimationCount  = 0;
-
-    Backgrounds.New(1);
-    BkgSceneAnimSpeed = 5;
-
-    CompiledScriptShared = false;
-    CompiledScriptSize = 0;
-
-    memset(Palette, 0, sizeof(Palette));
-    IsPersistent = false;
-    memset(Options, 0, sizeof(Options));
-}
-         */
 
         enum RoomFormatBlock
         {
@@ -1200,13 +1212,9 @@ namespace AGS.Editor
                     break;
             }
             bmp = new Bitmap(memoryBuffer[0] / _bpp, memoryBuffer[1], format);
-            for (int arin = 0; arin < memoryBuffer[1]; ++arin)
-            {
-                // TODO: I *definitely* don't know what I'm doing. -monkey
-                BitmapData line = bmp.LockBits(new Rectangle(0, arin, bmp.Width, 1), ImageLockMode.ReadWrite, format);
-                Marshal.Copy(memoryBuffer.ToArray(), (arin * memoryBuffer[0]) + 8, line.Scan0, memoryBuffer[0]);
-                bmp.UnlockBits(line);
-            }
+            BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadWrite, format);
+            Marshal.Copy(memoryBuffer.ToArray(), 8, bmpData.Scan0, memoryBuffer[0] * memoryBuffer[1]);
+            bmp.UnlockBits(bmpData);
             if (reader.BaseStream.Position != uncompSize) reader.BaseStream.Seek(uncompSize, SeekOrigin.Begin);
             return (int)uncompSize;
         }
@@ -1234,16 +1242,17 @@ namespace AGS.Editor
             return 0;
         }
 
-        int LoadCompressedAllegro(BinaryReader reader, out Bitmap bmp, ref List<Color> palette)
+        int LoadCompressedAllegro(BinaryReader reader, out Bitmap bmp)
         {
             short width = reader.ReadInt16();
             short height = reader.ReadInt16();
             bmp = new Bitmap(width, height, PixelFormat.Format8bppIndexed);
+            List<byte> line = new List<byte>();
             for (int i = 0; i < height; ++i)
             {
-                List<byte> line = new List<byte>();
-                CUnpackBitL(line, width, reader);
-                // TODO: I *definitely* don't know what I'm doing. -monkey
+                CUnpackBitL(line, width, reader); // line is cleared and capacity set by cunpack
+                // CHECKME: if locking and unlocking is slow, the entire bitmap could be read into
+                //          single list and then copied at once
                 BitmapData bmpLine = bmp.LockBits(new Rectangle(0, i, bmp.Width, 1), ImageLockMode.ReadWrite, PixelFormat.Format8bppIndexed);
                 Marshal.Copy(line.ToArray(), 0, bmpLine.Scan0, width);
                 bmp.UnlockBits(bmpLine);
@@ -1257,22 +1266,21 @@ namespace AGS.Editor
             if (_loadedVersion >= RoomFileVersion.Version208) _bpp = reader.ReadInt32();
             else _bpp = 1;
             if (_bpp < 1) _bpp = 1;
-            _walkBehindCount = reader.ReadInt16();
             _walkBehinds.Clear();
-            _walkBehinds.Capacity = _walkBehindCount;
-            for (int i = 0; i < _walkBehindCount; ++i)
+            _walkBehinds.Capacity = reader.ReadInt16();
+            for (int i = 0; i < _walkBehinds.Capacity; ++i)
             {
                 _walkBehinds.Add(new RoomWalkBehind());
                 _walkBehinds[i].Baseline = reader.ReadInt16();
             }
-            _hotspotCount = reader.ReadInt32();
-            // FIXME check version? -per existing note from native code-
-            if (_hotspotCount == 0) _hotspotCount = 20;
             _hotspots.Clear();
-            _hotspots.Capacity = _hotspotCount;
-            for (int i = 0; i < _hotspotCount; ++i)
+            _hotspots.Capacity = reader.ReadInt32();
+            // FIXME check version? -per existing note from native code-
+            // newer version with dynamic limits shouldn't do this(?)
+            if (_hotspots.Capacity == 0) _hotspots.Capacity = 20;
+            for (int i = 0; i < _hotspots.Capacity; ++i)
             {
-                _hotspots.Add(new RoomHotspot(null));
+                _hotspots.Add(new RoomHotspot(null)); // TODO: change notification?
                 _hotspots[i].WalkToPoint = new Point(reader.ReadInt16(), reader.ReadInt16());
             }
             int hotspotDescSize = 30;
@@ -1293,10 +1301,9 @@ namespace AGS.Editor
                     hotspot.Name = Encoding.ASCII.GetString(bytes);
                 }
             }
-            _walkableAreaCount = reader.ReadInt32();
             _walkableAreas.Clear();
-            _walkableAreas.Capacity = _walkableAreaCount;
-            for (int i = 0; i < _walkableAreaCount; ++i)
+            _walkableAreas.Capacity = reader.ReadInt32();
+            for (int i = 0; i < _walkableAreas.Capacity; ++i)
             {
                 _walkableAreas.Add(new RoomWalkableArea());
                 if (_loadedVersion < RoomFileVersion.Version340Alpha)
@@ -1315,12 +1322,11 @@ namespace AGS.Editor
             _edgeBottom = reader.ReadInt16();
             _edgeLeft = reader.ReadInt16();
             _edgeRight = reader.ReadInt16();
-            _objectCount = reader.ReadInt16();
             _objects.Clear();
-            _objects.Capacity = _objectCount;
-            for (int i = 0; i < _objectCount; ++i)
+            _objects.Capacity = reader.ReadInt16();
+            for (int i = 0; i < _objects.Capacity; ++i)
             {
-                _objects.Add(new RoomObject(null));
+                _objects.Add(new RoomObject(null)); // TODO: change notifier?
                 _objects[i].Image = reader.ReadInt16();
                 _objects[i].StartX = reader.ReadInt16();
                 _objects[i].StartY = reader.ReadInt16();
@@ -1335,8 +1341,7 @@ namespace AGS.Editor
                 for (int i = 0; i < _localVariableCount; ++i)
                 {
                     _localVariables.Add(new OldInteractionVariable("IntVar_" + i.ToString(), 0));
-                    byte[] bytes = new byte[23];
-                    reader.Read(bytes, 0, 23);
+                    byte[] bytes = reader.ReadBytes(23);
                     _localVariables[i].Name = Encoding.ASCII.GetString(bytes);
                     if (_loadedVersion < RoomFileVersion.Version340Alpha)
                     {
@@ -1351,11 +1356,11 @@ namespace AGS.Editor
             {
                 if (_loadedVersion < RoomFileVersion.Version300A)
                 {
-                    for (int i = 0; i < _hotspotCount; ++i)
+                    for (int i = 0; i < _hotspots.Count; ++i)
                     {
                         ConvertInteractions(_hotspots[i].Interactions, DeserializeOldInteraction(reader), "hotspot" + i.ToString() + "_", null, 1);
                     }
-                    for (int i = 0; i < _objectCount; ++i)
+                    for (int i = 0; i < _objects.Count; ++i)
                     {
                         ConvertInteractions(_objects[i].Interactions, DeserializeOldInteraction(reader), "object" + i.ToString() + "_", null, 2);
                     }
@@ -1363,9 +1368,9 @@ namespace AGS.Editor
                 }
                 if (_loadedVersion >= RoomFileVersion.Version255B)
                 {
-                    _regionCount = reader.ReadInt32();
-                    _regions.Capacity = _regionCount;
-                    for (int i = 0; i < _regionCount; ++i)
+                    _regions.Clear();
+                    _regions.Capacity = reader.ReadInt32();
+                    for (int i = 0; i < _regions.Capacity; ++i)
                     {
                         _regions.Add(new RoomRegion());
                         if (_loadedVersion < RoomFileVersion.Version300A)
@@ -1377,15 +1382,15 @@ namespace AGS.Editor
                 if (_loadedVersion >= RoomFileVersion.Version300A)
                 {
                     DeserializeInteractionScripts(reader, _interactions);
-                    for (int i = 0; i < _hotspotCount; ++i)
+                    for (int i = 0; i < _hotspots.Count; ++i)
                     {
                         DeserializeInteractionScripts(reader, _hotspots[i].Interactions);
                     }
-                    for (int i = 0; i < _objectCount; ++i)
+                    for (int i = 0; i < _objects.Count; ++i)
                     {
                         DeserializeInteractionScripts(reader, _objects[i].Interactions);
                     }
-                    for (int i = 0; i < _regionCount; ++i)
+                    for (int i = 0; i < _regions.Count; ++i)
                     {
                         DeserializeInteractionScripts(reader, _regions[i].Interactions);
                     }
@@ -1393,7 +1398,7 @@ namespace AGS.Editor
             }
             if (_loadedVersion >= RoomFileVersion.Version200Alpha)
             {
-                for (int i = 0; i < _objectCount; ++i)
+                for (int i = 0; i < _objects.Count; ++i)
                 {
                     _objects[i].Baseline = reader.ReadInt32();
                 }
@@ -1402,18 +1407,18 @@ namespace AGS.Editor
             }
             if (_loadedVersion >= RoomFileVersion.Version262)
             {
-                for (int i = 0; i < _objectCount; ++i)
+                for (int i = 0; i < _objects.Count; ++i)
                 {
                     int flags = reader.ReadInt16(); // TODO: this needs to be stored in the object somewhere!!
                     // _objects[i].Flags = flags; <-- something like that
                     /*
-#define OBJF_NOINTERACT        1  // not clickable
-#define OBJF_NOWALKBEHINDS     2  // ignore walk-behinds
-#define OBJF_HASTINT           4  // the tint_* members are valid
-#define OBJF_USEREGIONTINTS    8  // obey region tints/light areas
-#define OBJF_USEROOMSCALING 0x10  // obey room scaling areas
-#define OBJF_SOLID          0x20  // blocks characters from moving
-#define OBJF_DELETED        0x40  // object has been deleted
+                       #define OBJF_NOINTERACT        1  // not clickable
+                       #define OBJF_NOWALKBEHINDS     2  // ignore walk-behinds
+                       #define OBJF_HASTINT           4  // the tint_* members are valid
+                       #define OBJF_USEREGIONTINTS    8  // obey region tints/light areas
+                       #define OBJF_USEROOMSCALING 0x10  // obey room scaling areas
+                       #define OBJF_SOLID          0x20  // blocks characters from moving
+                       #define OBJF_DELETED        0x40  // object has been deleted
                      */
                 }
             }
@@ -1421,30 +1426,30 @@ namespace AGS.Editor
             {
                 _resolution = (RoomResolution)reader.ReadInt16();
             }
+            _walkableAreas.Clear();
             if (_loadedVersion >= RoomFileVersion.Version240)
             {
-                _walkableAreaCount = reader.ReadInt32();
+                _walkableAreas.Capacity = reader.ReadInt32();
             }
             else
             {
                 const int LEGACY_MAX_WALKABLE_AREAS = 15;
-                _walkableAreaCount = LEGACY_MAX_WALKABLE_AREAS;
+                _walkableAreas.Capacity = LEGACY_MAX_WALKABLE_AREAS;
             }
-            _walkableAreas.Capacity = _walkBehindCount;
-            for (int i = 0; i < _walkBehindCount; ++i)
+            for (int i = 0; i < _walkableAreas.Capacity; ++i)
             {
                 _walkableAreas.Add(new RoomWalkableArea());
             }
             if (_loadedVersion >= RoomFileVersion.Version200Alpha7)
             {
-                for (int i = 0; i < _walkableAreaCount; ++i)
+                for (int i = 0; i < _walkableAreas.Count; ++i)
                 {
                     _walkableAreas[i].MinScalingLevel = reader.ReadInt16() + 100;
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Version214)
             {
-                for (int i = 0; i < _walkableAreaCount; ++i)
+                for (int i = 0; i < _walkableAreas.Count; ++i)
                 {
                     int light = reader.ReadInt16(); // TODO: store this in the area
                     // _walkableAreas[i].LightLevel = light; <-- something like that
@@ -1452,7 +1457,7 @@ namespace AGS.Editor
             }
             if (_loadedVersion >= RoomFileVersion.Version251)
             {
-                for (int i = 0; i < _walkableAreaCount; ++i)
+                for (int i = 0; i < _walkableAreas.Count; ++i)
                 {
                     // TODO: CHECKME, the engine uses these properties weirdly
                     _walkableAreas[i].MaxScalingLevel = reader.ReadInt16() + 100;
@@ -1464,12 +1469,12 @@ namespace AGS.Editor
                     }
                     else _walkableAreas[i].UseContinuousScaling = false;
                 }
-                for (int i = 0; i < _walkableAreaCount; ++i)
+                for (int i = 0; i < _walkableAreas.Count; ++i)
                 {
                     int top = reader.ReadInt16(); // TODO: store in area
                     // _walkableAreas[i].Top = top; <-- something like that
                 }
-                for (int i = 0; i < _walkableAreaCount; ++i)
+                for (int i = 0; i < _walkableAreas.Count; ++i)
                 {
                     int bottom = reader.ReadInt16(); // TODO: store in area
                     // _walkableAreas[i].Bottom = bottom; <-- something like that
@@ -1485,22 +1490,23 @@ namespace AGS.Editor
             {
                 _options[i] = (int)options[i];
             }
-            _messageCount = reader.ReadInt16();
-            _messages.Capacity = _messageCount;
+            _messages.Clear();
+            _messages.Capacity = reader.ReadInt16();
             if (_loadedVersion >= RoomFileVersion.Version272)
             {
                 _gameID = reader.ReadInt32();
             }
             if (_loadedVersion >= RoomFileVersion.Pre114Version3)
             {
-                _messageInfos.Capacity = _messageCount;
-                for (int i = 0; i < _messageCount; ++i)
+                _messageInfos.Clear();
+                _messageInfos.Capacity = _messages.Capacity;
+                for (int i = 0; i < _messages.Capacity; ++i)
                 {
                     _messageInfos[i].ReadFromFile(reader);
                 }
             }
             string messageBuffer = null;
-            for (int i = 0; i < _messageCount; ++i)
+            for (int i = 0; i < _messages.Capacity; ++i)
             {
                 if (_loadedVersion >= RoomFileVersion.Version261)
                 {
@@ -1521,7 +1527,8 @@ namespace AGS.Editor
                 {
                     // [IKM] (from native) CHECKME later: this will cause trouble if structure changes
                     // TODO: phase this out of the writing process! It's obviously not being read into
-                    //       the structure. -monkey
+                    //       the structure. Once it's phased out then future changes to the structure
+                    //       on the engine side won't matter. -monkey
                     // TODO: Verify this as getting correct size for current structure layout.
                     int size = Marshal.SizeOf(new DummyFullAnimation());
                     reader.ReadBytes(size * animationCount);
@@ -1533,7 +1540,7 @@ namespace AGS.Editor
                 int numVarNames = reader.ReadInt32();
                 for (int i = 0; i < numVarNames; ++i)
                 {
-                    int lenoft = reader.ReadByte(); // who the what now?
+                    int lenoft = reader.ReadByte();
                     reader.ReadBytes(lenoft);
                 }
                 int ct = 0;
@@ -1547,24 +1554,24 @@ namespace AGS.Editor
             }
             if (_loadedVersion >= RoomFileVersion.Version114)
             {
-                for (int i = 0; i < _walkableAreaCount; ++i)
+                for (int i = 0; i < _walkableAreas.Count; ++i)
                 {
                     int shadingView = reader.ReadInt16(); // TODO: store this in the structure if it's being used
                     // _walkableAreas[i].ShadingView = shadingView; <-- like that
                 }
                 const int LEGACY_MAX_ROOM_WALKAREAS = 15;
-                for (int i = _walkableAreaCount; i < (LEGACY_MAX_ROOM_WALKAREAS + 1); ++i)
+                for (int i = _walkableAreas.Count; i < (LEGACY_MAX_ROOM_WALKAREAS + 1); ++i)
                 {
                     reader.ReadInt16();
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Version255B)
             {
-                for (int i = 0; i < _regionCount; ++i)
+                for (int i = 0; i < _regions.Count; ++i)
                 {
                     _regions[i].LightLevel = reader.ReadInt16();
                 }
-                for (int i = 0; i < _regionCount; ++i)
+                for (int i = 0; i < _regions.Count; ++i)
                 {
                     int tint = reader.ReadInt32(); // TODO: split between Region.RedTint, GreenTint, and BlueTint
                 }
@@ -1578,7 +1585,7 @@ namespace AGS.Editor
             else
             {
                 Bitmap bmp;
-                LoadCompressedAllegro(reader, out bmp, ref _palette);
+                LoadCompressedAllegro(reader, out bmp);
                 _backgrounds[0].Graphic = bmp;
             }
             if ((_backgrounds[0].Graphic.Width > 320) && (_loadedVersion < RoomFileVersion.Version200Final))
@@ -1587,31 +1594,333 @@ namespace AGS.Editor
             }
             if (_loadedVersion >= RoomFileVersion.Version255B)
             {
-                LoadCompressedAllegro(reader, out _regionMask, ref _palette);
+                LoadCompressedAllegro(reader, out _regionMask);
             }
             else if (_loadedVersion >= RoomFileVersion.Version114)
             {
                 Bitmap bmp;
-                LoadCompressedAllegro(reader, out bmp, ref _palette);
+                LoadCompressedAllegro(reader, out bmp);
                 // an old version, this mask is just deleted anyway
             }
-            LoadCompressedAllegro(reader, out _walkableAreaMask, ref _palette);
-            LoadCompressedAllegro(reader, out _walkBehindMask, ref _palette);
-            LoadCompressedAllegro(reader, out _hotspotMask, ref _palette);
+            LoadCompressedAllegro(reader, out _walkableAreaMask);
+            LoadCompressedAllegro(reader, out _walkBehindMask);
+            LoadCompressedAllegro(reader, out _hotspotMask);
             if (_loadedVersion < RoomFileVersion.Version255B)
             {
                 // old version - copy walkable areas to Regions
                 if (_regionMask == null)
                 {
                     _regionMask = new Bitmap(_walkableAreaMask);
-                    _regionCount = _walkableAreaCount;
-                    _regions.Capacity = _regionCount;
-                    for (int i = 0; i < _regionCount; ++i)
+                    _regions.Clear();
+                    _regions.Capacity = _walkableAreas.Count;
+                    for (int i = 0; i < _regions.Capacity; ++i)
                     {
                         _regions.Add(new RoomRegion());
                         // TODO: copy light level? RoomWalkableArea doesn't have a LightLevel property
                     }
                 }
+            }
+            return RoomLoadError.NoError;
+        }
+
+        private static string FileReadString(BinaryReader reader)
+        {
+            StringBuilder sb = new StringBuilder(300);
+            for (byte b = reader.ReadByte(); b != 0; sb.Append(b), b = reader.ReadByte()) ;
+            return sb.ToString();
+        }
+
+        private class CompiledScript // TODO: implement AGS.Types.ICompiledScript? (it's seemingly unused ATM)
+        {
+            public const string FILE_SIGNATURE = "SCOM";
+            public const int SCOM_VERSION = 89;
+            public const uint END_FILE_SIG = 0xBEEFCAFE;
+
+            List<byte> _globalData;
+            List<int> _code;
+            List<byte> _strings;
+            List<byte> _fixUpTypes; // global data/string area/etc.
+            List<int> _fixUps; // code array index to fix-up (in ints)
+            List<string> _imports;
+            List<string> _exports;
+            List<int> _exportAddresses; // high byte is type; low 24-bits are offset
+            int _instances;
+            // 'sections' allow the interpreter to find out which bit
+            // of the code came from header files, and which from the main file
+            List<string> _sectionNames;
+            List<int> _sectionOffsets;
+
+            public static CompiledScript CreateFromFile(BinaryReader reader)
+            {
+                CompiledScript script = new CompiledScript();
+                return (script.Read(reader) ? script : null);
+            }
+
+            public bool Read(BinaryReader reader)
+            {
+                _instances = 0;
+                string gotSig = Encoding.ASCII.GetString(reader.ReadBytes(4));
+                int fileVer = reader.ReadInt32();
+                if ((gotSig != FILE_SIGNATURE) || (fileVer > SCOM_VERSION))
+                {
+                    // TODO: log error "File was not written by CompiledScript.Write or Seek position is incorrect."
+                    return false;
+                }
+                _globalData = new List<byte>(reader.ReadInt32());
+                _code = new List<int>(reader.ReadInt32());
+                _strings = new List<byte>(reader.ReadInt32());
+                if (_globalData.Capacity > 0)
+                {
+                    _globalData.AddRange(reader.ReadBytes(_globalData.Capacity));
+                }
+                else _globalData = null;
+                if (_code.Capacity > 0)
+                {
+                    byte[] bytes = reader.ReadBytes(_code.Capacity * sizeof(int));
+                    for (int i = 0; i < _code.Capacity; ++i)
+                    {
+                        _code[i] = BitConverter.ToInt32(bytes, i * sizeof(int));
+                    }
+                }
+                else _code = null;
+                if (_strings.Capacity > 0) _strings.AddRange(reader.ReadBytes(_strings.Capacity));
+                else _strings = null;
+                _fixUpTypes = new List<byte>(reader.ReadInt32());
+                if (_fixUpTypes.Capacity > 0)
+                {
+                    _fixUps = new List<int>(_fixUpTypes.Capacity);
+                    _fixUpTypes.AddRange(reader.ReadBytes(_fixUpTypes.Capacity));
+                    byte[] bytes = reader.ReadBytes(_fixUps.Capacity * sizeof(int));
+                    for (int i = 0; i < _fixUps.Capacity; ++i)
+                    {
+                        _fixUps[i] = BitConverter.ToInt32(bytes, i * sizeof(int));
+                    }
+                }
+                else
+                {
+                    _fixUpTypes = null;
+                    _fixUps = null;
+                }
+                _imports = new List<string>(reader.ReadInt32());
+                for (int i = 0; i < _imports.Capacity; ++i)
+                {
+                    _imports.Add(FileReadString(reader));
+                }
+                _exports = new List<string>(reader.ReadInt32());
+                _exportAddresses = new List<int>(_exports.Capacity);
+                for (int i = 0; i < _exports.Capacity; ++i)
+                {
+                    _exports.Add(FileReadString(reader));
+                    _exportAddresses.Add(reader.ReadInt32());
+                }
+                if (fileVer >= 83)
+                {
+                    // read in the sections
+                    _sectionNames = new List<string>(reader.ReadInt32());
+                    _sectionOffsets = new List<int>(_sectionNames.Capacity);
+                    for (int i = 0; i < _sectionNames.Capacity; ++i)
+                    {
+                        _sectionNames.Add(FileReadString(reader));
+                        _sectionOffsets.Add(reader.ReadInt32());
+                    }
+                }
+                else
+                {
+                    _sectionNames = null;
+                    _sectionOffsets = null;
+                }
+                if (reader.ReadUInt32() != END_FILE_SIG)
+                {
+                    // TODO: log error "Internal error rebuilding script"
+                    return false;
+                }
+                return true;
+            }
+
+            public string GetSectionName(int offset)
+            {
+                // TODO: implement or destroy
+                return null;
+            }
+        }
+
+        RoomLoadError ReadScriptBlock(BinaryReader reader)
+        {
+            const string password = "Avis Durgan";
+            int scriptLength = reader.ReadInt32();
+            byte[] bytes = reader.ReadBytes(scriptLength);
+            for (int i = 0; i < scriptLength; ++i)
+            {
+                bytes[i] += (byte)password[i % password.Length];
+            }
+            _textScript = Encoding.ASCII.GetString(bytes);
+            return RoomLoadError.NoError;
+        }
+
+        RoomLoadError ReadObjectNamesBlock(BinaryReader reader)
+        {
+            const int MAX_OBJECT_NAME_LEN = 30;
+            int count = reader.ReadByte();
+            if (_loadedVersion >= RoomFileVersion.Version340Alpha)
+            {
+                // allow more than 255 object names in room file
+                // TODO: when writing room file save this count as Int32 not Byte (aka UInt8)
+                byte[] bytes = new byte[4];
+                reader.Read(bytes, 1, 3);
+                bytes[0] = (byte)count;
+                count = BitConverter.ToInt32(bytes, 0);
+            }
+            if (count != _objects.Count)
+            {
+                return RoomLoadError.InconsistentDataForObjectNames;
+            }
+            for (int i = 0; i < _objects.Count; ++i)
+            {
+                _objects[i].Name = Encoding.ASCII.GetString(reader.ReadBytes(MAX_OBJECT_NAME_LEN));
+            }
+            return RoomLoadError.NoError;
+        }
+
+        RoomLoadError ReadAnimatedBackgroundBlock(BinaryReader reader)
+        {
+            _backgrounds.Capacity = reader.ReadByte();
+            _backgroundAnimationSpeed = reader.ReadByte();
+            while (_backgrounds.Count < _backgrounds.Capacity) _backgrounds.Add(new RoomBackground());
+            if (_loadedVersion >= RoomFileVersion.Version255A)
+            {
+                for (int i = 0; i < _backgrounds.Count; ++i)
+                {
+                    _backgrounds[i].PaletteShared = (reader.ReadByte() != 0);
+                }
+            }
+            for (int i = 1; i < _backgrounds.Count; ++i)
+            {
+                Bitmap bmp;
+                List<Color> pal = _backgrounds[i].Palette;
+                LoadLZW(reader, out bmp, ref pal);
+                _backgrounds[i].Palette = pal;
+                _backgrounds[i].Graphic = bmp;
+            }
+            return RoomLoadError.NoError;
+        }
+
+        RoomLoadError ReadCompiledScriptBlock(BinaryReader reader)
+        {
+            _compiledScript = CompiledScript.CreateFromFile(reader);
+            _compiledScriptShared = false;
+            return (_compiledScript == null ? RoomLoadError.ScriptLoadFailed : RoomLoadError.NoError);
+        }
+
+        RoomLoadError ReadPropertiesBlock(BinaryReader reader)
+        {
+            return RoomLoadError.NoError;
+        }
+
+        /*
+         * enum CustomPropertyVersion
+{
+    kCustomPropertyVersion_pre340 = 1,
+    kCustomPropertyVersion_v340,
+    kCustomPropertyVersion_Current = kCustomPropertyVersion_v340
+};
+
+enum CustomPropertyType
+{
+    kCustomPropertyUndefined = 0,
+    kCustomPropertyBoolean,
+    kCustomPropertyInteger,
+    kCustomPropertyString
+};
+         * 
+         * enum CustomPropertyError
+{
+    kCustomPropertyErr_NoError,
+    kCustomPropertyErr_UnsupportedFormat
+};
+         * 
+         * CustomPropertyError CustomProperties::UnSerialize(Common::Stream *in)
+{
+    CustomPropertyVersion version = (CustomPropertyVersion)in->ReadInt32();
+    if (version < kCustomPropertyVersion_pre340 ||
+        version > kCustomPropertyVersion_Current)
+    {
+        return kCustomPropertyErr_UnsupportedFormat;
+    }
+
+    Properties.SetLength(in->ReadInt32());
+    if (version == kCustomPropertyVersion_pre340)
+    {
+        for (int i = 0; i < Properties.GetCount(); ++i)
+        {
+            Properties[i].Name.Read(in, LEGACY_MAX_CUSTOM_PROPERTY_NAME_LENGTH);
+            Properties[i].Value.Read(in, LEGACY_MAX_CUSTOM_PROPERTY_VALUE_LENGTH);
+        }
+    }
+    else
+    {
+        for (int i = 0; i < Properties.GetCount(); ++i)
+        {
+            Properties[i].Name.Read(in);
+            Properties[i].Value.Read(in);
+        }
+    }
+    return kCustomPropertyErr_NoError;
+}
+         */
+
+        /*
+         * RoomInfoError RoomInfo::ReadPropertiesBlock(Stream *in)
+{
+    if (in->ReadInt32() != 1)
+    {
+        return kRoomInfoErr_PropertiesFormatNotSupported;
+    }
+
+    if (Properties.UnSerialize(in))
+    {
+        return kRoomInfoErr_PropertiesLoadFailed;
+    }
+
+    for (int i = 0; i < HotspotCount; ++i)
+    {
+        if (Hotspots[i].Properties.UnSerialize(in))
+        {
+            return kRoomInfoErr_PropertiesLoadFailed;
+        }
+    }
+    for (int i = 0; i < ObjectCount; ++i)
+    {
+        if (Objects[i].Properties.UnSerialize(in))
+        {
+            return kRoomInfoErr_PropertiesLoadFailed;
+        }
+    }
+
+    return kRoomInfoErr_NoError;
+}
+         */
+
+        RoomLoadError ReadObjectScriptNamesBlock(BinaryReader reader)
+        {
+            const int MAX_SCRIPT_NAME_LEN = 20;
+            int count = reader.ReadByte();
+            if (_loadedVersion >= RoomFileVersion.Version340Alpha)
+            {
+                // allow more than 255 object names in room file
+                // TODO: when writing room file save this count as Int32 not Byte (aka UInt8)
+                byte[] bytes = new byte[4];
+                reader.Read(bytes, 1, 3);
+                bytes[0] = (byte)count;
+                count = BitConverter.ToInt32(bytes, 0);
+            }
+            if (count != _objects.Count)
+            {
+                return RoomLoadError.InconsistentDataForObjectScriptNames;
+            }
+            for (int i = 0; i < _objects.Count; ++i)
+            {
+                string scriptName = Encoding.ASCII.GetString(reader.ReadBytes(MAX_SCRIPT_NAME_LEN));
+                // TODO: store this in the object
             }
             return RoomLoadError.NoError;
         }
@@ -1628,25 +1937,25 @@ namespace AGS.Editor
                     readBlockError = ReadMainBlock(reader);
                     break;
                 case RoomFormatBlock.Script:
-                    readBlockError = RoomLoadError.NoError;
+                    readBlockError = ReadScriptBlock(reader);
                     break;
                 case RoomFormatBlock.CompiledScript:
                 case RoomFormatBlock.CompiledScript2:
                     return RoomLoadError.OldBlockNotSupported;
                 case RoomFormatBlock.ObjectNames:
-                    readBlockError = RoomLoadError.NoError;
+                    readBlockError = ReadObjectNamesBlock(reader);
                     break;
                 case RoomFormatBlock.AnimatedBackground:
-                    readBlockError = RoomLoadError.NoError;
+                    readBlockError = ReadAnimatedBackgroundBlock(reader);
                     break;
                 case RoomFormatBlock.CompiledScript3:
-                    readBlockError = RoomLoadError.NoError;
+                    readBlockError = ReadCompiledScriptBlock(reader);
                     break;
                 case RoomFormatBlock.Properties:
-                    readBlockError = RoomLoadError.NoError;
+                    readBlockError = ReadPropertiesBlock(reader);
                     break;
                 case RoomFormatBlock.ObjectScriptNames:
-                    readBlockError = RoomLoadError.NoError;
+                    readBlockError = ReadObjectScriptNamesBlock(reader);
                     break;
                 default:
                     return RoomLoadError.UnknownBlockType;
@@ -1662,35 +1971,44 @@ namespace AGS.Editor
             return RoomLoadError.NoError;
         }
 
-        /*RoomInfoError RoomInfo::ReadBlock(Stream *in, RoomFormatBlock block_type)
-{
-    switch (block_type)
-    {
-    case kRoomBlock_Main:
-        read_block_err = ReadMainBlock(in);
-        break;
-    case kRoomBlock_Script:
-        read_block_err = ReadScriptBlock(in);
-        break;
-    case kRoomBlock_ObjectNames:
-        read_block_err = ReadObjectNamesBlock(in);
-        break;
-    case kRoomBlock_AnimBkg:
-        read_block_err = ReadAnimBkgBlock(in);
-        break;
-    case kRoomBlock_CompScript3:
-        read_block_err = ReadScript3Block(in);
-        break;
-    case kRoomBlock_Properties:
-        read_block_err = ReadPropertiesBlock(in);
-        break;
-    case kRoomBlock_ObjectScriptNames:
-        read_block_err = ReadObjectScriptNamesBlock(in);
-        break;
-    };
-}*/
+        void ProcessAfterRead(int id, bool gameIsHighRes)
+        {
+            _backgrounds[0].Palette.Clear();
+            _backgrounds[0].Palette.AddRange(_palette);
+            if ((_loadedVersion < RoomFileVersion.Version303B) && (gameIsHighRes))
+            {
+                // Pre-3.0.3, multiply up co-ordinates
+                // If you change this, also change convert_room_coordinates_to_low res
+                // function in the engine
+                foreach (RoomObject obj in _objects)
+                {
+                    obj.StartX <<= 1;
+                    obj.StartY <<= 1;
+                    if (obj.Baseline > 0) obj.Baseline <<= 1;
+                }
+                foreach (RoomHotspot hot in _hotspots)
+                {
+                    hot.WalkToPoint = new Point(hot.WalkToPoint.X << 1, hot.WalkToPoint.Y << 1);
+                }
+                foreach (RoomWalkBehind walkBehind in _walkBehinds)
+                {
+                    walkBehind.Baseline <<= 1;
+                }
+                _edgeLeft <<= 1;
+                _edgeTop <<= 1;
+                _edgeBottom <<= 1;
+                _edgeRight <<= 1;
+                _width <<= 1;
+                _height <<= 1;
+            }
+            if (_loadedVersion < RoomFileVersion.Version340Alpha)
+            {
+                const int LEGACY_MAX_SAVE_STATE_ROOMS = 300;
+                _stateSaving = (id <= LEGACY_MAX_SAVE_STATE_ROOMS);
+            }
+        }
 
-        private RoomLoadError ReadFromFile(BinaryReader reader, int roomNumber, bool hiRes, ref RoomFormatBlock lastBlock)
+        private RoomLoadError ReadFromFile(BinaryReader reader, int id, bool gameIsHighRes, ref RoomFormatBlock lastBlock)
         {
             Free();
             if (reader == null) return RoomLoadError.InternalLogicError;
@@ -1712,68 +2030,53 @@ namespace AGS.Editor
                     return error;
                 }
             }
-            // TODO: ProcessAfterRead(id, game_is_hires); -- FROM NATIVE
+            ProcessAfterRead(id, gameIsHighRes);
             return RoomLoadError.NoError;
         }
 
-        public static Room Load(int roomNumber)
+        public Room Load(int roomNumber, string filename, int id, bool gameIsHighRes)
         {
-            return null;
+            FileStream fstream = File.Open(filename, FileMode.Open, FileAccess.Read);
+            if (fstream == null)
+            {
+                throw new AGSEditorException("LoadRoom: Unable to load the room file '" + filename + "'\n" +
+                                             "Make sure that you saved the room to the correct folder (it should be\n" +
+                                             "in your game's project folder).\n" +
+                                             "Also check that the player character's starting room is set correctly.\n");
+            }
+            BinaryReader reader = new BinaryReader(fstream);
+            RoomFormatBlock lastBlock = RoomFormatBlock.None;
+            RoomLoadError loadError = ReadFromFile(reader, id, gameIsHighRes, ref lastBlock);
+            reader.BaseStream.Close();
+            switch (loadError)
+            {
+                case RoomLoadError.InternalLogicError:
+                    throw new AGSEditorException("LoadRoom: internal logic error.\n");
+                case RoomLoadError.UnexpectedEOF:
+                    throw new AGSEditorException("LoadRoom: unexpected end of file while loading room.\n");
+                case RoomLoadError.FormatNotSupported:
+                    throw new AGSEditorException("LoadRoom: Bad packed file. Either the file requires a newer or older version of\n" +
+                                                 "this program or the file is corrupt.\n");
+                case RoomLoadError.UnknownBlockType:
+                    throw new AGSEditorException("LoadRoom: unknown block type " + ((int)lastBlock).ToString() + " encountered in '" + filename + "'.\n");
+                case RoomLoadError.OldBlockNotSupported:
+                    throw new AGSEditorException("LoadRoom: old room format. Please upgrade the room.");
+                case RoomLoadError.InconsistentDataForObjectNames:
+                    throw new AGSEditorException("LoadRoom: inconsistent blocks for object names.\n");
+                case RoomLoadError.ScriptLoadFailed:
+                    throw new AGSEditorException("LoadRoom: Script load failed; need newer version?\n");
+                case RoomLoadError.PropertiesFormatNotSupported:
+                    throw new AGSEditorException("LoadRoom: unknown Custom Properties block encountered.\n");
+                case RoomLoadError.PropertiesLoadFailed:
+                    throw new AGSEditorException("LoadRoom: error reading Custom Properties block.\n");
+                case RoomLoadError.InconsistentDataForObjectScriptNames:
+                    throw new AGSEditorException("LoadRoom: inconsistent blocks for object script names.\n");
+                default:
+                    break;
+            }
+            Room room = new Room(roomNumber);
+            // TODO: copy data from here to Room object
+            return room;
         }
-        /*update_polled_stuff_if_runtime();
-
-    Stream *in = AssetManager::OpenAsset(filename);
-    if (in == NULL)
-    {
-        String err_msg = String::FromFormat(
-            "Load_room: Unable to load the room file '%s'\n"
-            "Make sure that you saved the room to the correct folder (it should be\n"
-            "in your game's sub-folder of the AGS directory).\n"
-            "Also check that the player character's starting room is set correctly.\n",
-            filename.GetCStr());
-        quit(err_msg);
-    }
-    update_polled_stuff_if_runtime();  // it can take a while to load the file sometimes
-
-    RoomFormatBlock last_block;
-    RoomInfoError load_err = room.ReadFromFile(in, id, game_is_hires, &last_block);
-    delete in;
-
-    switch (load_err)
-    {
-    case kRoomInfoErr_InternalLogicError:
-        quit("Load_Room: internal logic error.\n");
-        break;
-    case kRoomInfoErr_UnexpectedEOF:
-        quit("LoadRoom: unexpected end of file while loading room");
-        break;
-    case kRoomInfoErr_FormatNotSupported:
-        quit("Load_Room: Bad packed file. Either the file requires a newer or older version of\n"
-            "this program or the file is corrupt.\n");
-        break;
-    case kRoomInfoErr_UnknownBlockType:
-        quit(String::FromFormat("LoadRoom: unknown block type %d encountered in '%s'", last_block, filename.GetCStr()));
-        break;
-    case kRoomInfoErr_OldBlockNotSupported:
-        quit("Load_room: old room format. Please upgrade the room.");
-        break;
-    case kRoomInfoErr_InconsistentDataForObjectNames:
-        quit("Load_room: inconsistent blocks for object names");
-        break;
-    case kRoomInfoErr_ScriptLoadFailed:
-        quit("Load_room: Script load failed; need newer version?");
-        break;
-    case kRoomInfoErr_PropertiesFormatNotSupported:
-        quit("LoadRoom: unknown Custom Properties block encounreted");
-        break;
-    case kRoomInfoErr_PropertiesLoadFailed:
-        quit("LoadRoom: error reading custom properties block");
-        break;
-    case kRoomInfoErr_InconsistentDataForObjectScriptNames:
-        quit("Load_room: inconsistent blocks for object script names");
-        break;
-    }
-
-    return load_err == kRoomInfoErr_NoError;*/
     }
 }
