@@ -54,6 +54,7 @@ namespace AGS.Editor
         private int _compiledScriptSize;
         private CompiledScript _compiledScript;
         private string _textScript;
+        private CustomProperties _properties = new CustomProperties();
 
         static RoomLoader()
         {
@@ -1811,94 +1812,112 @@ namespace AGS.Editor
             return (_compiledScript == null ? RoomLoadError.ScriptLoadFailed : RoomLoadError.NoError);
         }
 
-        RoomLoadError ReadPropertiesBlock(BinaryReader reader)
+        enum CustomPropertiesError
         {
-            return RoomLoadError.NoError;
-        }
+            NoError,
+            UnsupportedFormat
+        };
 
+        enum CustomPropertiesVersion
+        {
+            Pre340 = 1,
+            Version340,
+            Current = Version340
+        };
         /*
-         * enum CustomPropertyVersion
-{
-    kCustomPropertyVersion_pre340 = 1,
-    kCustomPropertyVersion_v340,
-    kCustomPropertyVersion_Current = kCustomPropertyVersion_v340
-};
-
-enum CustomPropertyType
+         *enum CustomPropertyType
 {
     kCustomPropertyUndefined = 0,
     kCustomPropertyBoolean,
     kCustomPropertyInteger,
     kCustomPropertyString
 };
-         * 
-         * enum CustomPropertyError
-{
-    kCustomPropertyErr_NoError,
-    kCustomPropertyErr_UnsupportedFormat
-};
-         * 
-         * CustomPropertyError CustomProperties::UnSerialize(Common::Stream *in)
-{
-    CustomPropertyVersion version = (CustomPropertyVersion)in->ReadInt32();
-    if (version < kCustomPropertyVersion_pre340 ||
-        version > kCustomPropertyVersion_Current)
-    {
-        return kCustomPropertyErr_UnsupportedFormat;
-    }
-
-    Properties.SetLength(in->ReadInt32());
-    if (version == kCustomPropertyVersion_pre340)
-    {
-        for (int i = 0; i < Properties.GetCount(); ++i)
-        {
-            Properties[i].Name.Read(in, LEGACY_MAX_CUSTOM_PROPERTY_NAME_LENGTH);
-            Properties[i].Value.Read(in, LEGACY_MAX_CUSTOM_PROPERTY_VALUE_LENGTH);
-        }
-    }
-    else
-    {
-        for (int i = 0; i < Properties.GetCount(); ++i)
-        {
-            Properties[i].Name.Read(in);
-            Properties[i].Value.Read(in);
-        }
-    }
-    return kCustomPropertyErr_NoError;
-}
          */
 
-        /*
-         * RoomInfoError RoomInfo::ReadPropertiesBlock(Stream *in)
-{
-    if (in->ReadInt32() != 1)
-    {
-        return kRoomInfoErr_PropertiesFormatNotSupported;
-    }
-
-    if (Properties.UnSerialize(in))
-    {
-        return kRoomInfoErr_PropertiesLoadFailed;
-    }
-
-    for (int i = 0; i < HotspotCount; ++i)
-    {
-        if (Hotspots[i].Properties.UnSerialize(in))
+        CustomPropertiesError UnserializeCustomProperties(BinaryReader reader, ref CustomProperties properties)
         {
-            return kRoomInfoErr_PropertiesLoadFailed;
+            CustomPropertiesVersion version = (CustomPropertiesVersion)reader.ReadInt32();
+            if ((version < CustomPropertiesVersion.Pre340) || (version > CustomPropertiesVersion.Current))
+            {
+                return CustomPropertiesError.UnsupportedFormat;
+            }
+            properties.PropertyValues.Clear();
+            int count = reader.ReadInt32(); // Dictionary<,> doesn't have a Capacity but it doesn't really matter to us here
+            const int LEGACY_MAX_CUSTOM_PROPERTY_NAME_LENGTH = 200;
+            const int LEGACY_MAX_CUSTOM_PROPERTY_VALUE_LENGTH = 500;
+            if (version == CustomPropertiesVersion.Pre340)
+            {
+                for (int i = 0; i < count; ++i)
+                {
+                    byte[] name = reader.ReadBytes(LEGACY_MAX_CUSTOM_PROPERTY_NAME_LENGTH);
+                    byte[] value = reader.ReadBytes(LEGACY_MAX_CUSTOM_PROPERTY_VALUE_LENGTH);
+                    CustomProperty property = new CustomProperty();
+                    property.Name = Encoding.ASCII.GetString(name);
+                    property.Value = Encoding.ASCII.GetString(value);
+                    properties.PropertyValues.Add(property.Name, property);
+                }
+            }
+            else
+            {
+                for (int i = 0; i < count; ++i)
+                {
+                    StringBuilder name = new StringBuilder(LEGACY_MAX_CUSTOM_PROPERTY_NAME_LENGTH);
+                    StringBuilder value = new StringBuilder(LEGACY_MAX_CUSTOM_PROPERTY_VALUE_LENGTH);
+                    for (byte b = reader.ReadByte(); b != 0; name.Append(b), b = reader.ReadByte()) ;
+                    for (byte b = reader.ReadByte(); b != 0; value.Append(b), b = reader.ReadByte()) ;
+                    CustomProperty property = new CustomProperty();
+                    property.Name = name.ToString();
+                    property.Value = value.ToString();
+                    properties.PropertyValues.Add(property.Name, property);
+                }
+            }
+            return CustomPropertiesError.NoError;
         }
-    }
-    for (int i = 0; i < ObjectCount; ++i)
-    {
-        if (Objects[i].Properties.UnSerialize(in))
-        {
-            return kRoomInfoErr_PropertiesLoadFailed;
-        }
-    }
 
-    return kRoomInfoErr_NoError;
-}
-         */
+        RoomLoadError ReadPropertiesBlock(BinaryReader reader)
+        {
+            if (reader.ReadInt32() != 1) return RoomLoadError.PropertiesFormatNotSupported;
+            if (UnserializeCustomProperties(reader, ref _properties) != CustomPropertiesError.NoError)
+            {
+                return RoomLoadError.PropertiesLoadFailed;
+            }
+            for (int i = 0; i < _hotspots.Count; ++i)
+            {
+                CustomProperties properties = _hotspots[i].Properties;
+                if (UnserializeCustomProperties(reader, ref properties) != CustomPropertiesError.NoError)
+                {
+                    return RoomLoadError.PropertiesLoadFailed;
+                }
+                else
+                {
+                    // by the time anything is read into our temporary, no errors are returned
+                    // otherwise we'd need to copy this in case of error also
+                    _hotspots[i].Properties.PropertyValues.Clear();
+                    // RoomHotspot.Properties setter isn't publicly accessible? urgh!
+                    foreach (CustomProperty property in properties.PropertyValues.Values) // CustomProperties isn't directly enumerable?? wut?
+                    {
+                        _hotspots[i].Properties.PropertyValues.Add(property.Name, property);
+                    }
+                }
+            }
+            for (int i = 0; i < _objects.Count; ++i)
+            {
+                CustomProperties properties = _objects[i].Properties;
+                if (UnserializeCustomProperties(reader, ref properties) != CustomPropertiesError.NoError)
+                {
+                    return RoomLoadError.PropertiesLoadFailed;
+                }
+                else
+                {
+                    _objects[i].Properties.PropertyValues.Clear();
+                    foreach (CustomProperty property in properties.PropertyValues.Values)
+                    {
+                        _objects[i].Properties.PropertyValues.Add(property.Name, property);
+                    }
+                }
+            }
+            return RoomLoadError.NoError;
+        }
 
         RoomLoadError ReadObjectScriptNamesBlock(BinaryReader reader)
         {
