@@ -6,6 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+//using System.Windows.Forms;
 
 namespace AGS.Editor
 {
@@ -1027,7 +1028,7 @@ namespace AGS.Editor
             int length = reader.ReadInt32();
             if ((length < 0) || (length > 5000000)) throw new AGS.Types.InvalidDataException("Error reading string: file is corrupt");
             byte[] bytes = reader.ReadBytes(length);
-            return DecryptText(Encoding.ASCII.GetString(bytes));
+            return DecryptText(GetNullTerminatedASCIIString(bytes));
         }
 
         string FileGetStringLimit(BinaryReader reader, int limit)
@@ -1094,46 +1095,36 @@ namespace AGS.Editor
 
         void LZWExpand(BinaryReader reader, int maxSize, ref int putBytes, ref int outBytes, List<byte> memoryBuffer)
         {
-            int bits;
-            byte ch;
-            int i;
-            int j;
-            int len;
-            int mask;
-            List<byte> lzbuffer;
-            putBytes = 0;
             const int N = 4096;
             const int F = 16;
-            lzbuffer = new List<byte>(N);
-            for (i = 0; i < N; ++i) lzbuffer.Add(0);
-            i = N - F;
-            while ((bits = reader.ReadByte()) != -1)
+            byte[] lzbuffer = new byte[N];
+            int i = (N - F);
+            for (int bits = reader.ReadByte(); bits != -1; bits = reader.ReadByte())
             {
-                for (mask = 0x01; (mask & 0xFF) != 0; mask <<= 1)
+                for (int mask = 0x01; (mask & 0xFF) != 0; mask <<= 1)
                 {
                     if ((bits & mask) != 0)
                     {
-                        j = reader.ReadInt16();
-                        len = ((j >> 12) & 15) + 3;
-                        j = (i - j - 1) & (N - 1);
-                        while (len-- > 0)
+                        int j = reader.ReadInt16();
+                        int len = (((j >> 12) & 15) + 3);
+                        j = ((i - j - 1) & (N - 1));
+                        for (; len != 0; --len)
                         {
                             lzbuffer[i] = lzbuffer[j];
                             MyPutC(lzbuffer[i], maxSize, ref putBytes, ref outBytes, memoryBuffer);
-                            j = (j + 1) & (N - 1);
-                            i = (i + 1) & (N - 1);
+                            j = ((j + 1) & (N - 1));
+                            i = ((i + 1) & (N - 1));
                         }
                     }
                     else
                     {
-                        ch = reader.ReadByte();
-                        lzbuffer[i] = ch;
+                        lzbuffer[i] = reader.ReadByte();
                         MyPutC(lzbuffer[i], maxSize, ref putBytes, ref outBytes, memoryBuffer);
-                        i = (i + 1) & (N - 1);
+                        i = ((i + 1) & (N - 1));
                     }
-                    if ((putBytes >= maxSize) && (maxSize > 0)) break;
+                    if ((maxSize > 0) && (putBytes >= maxSize)) break;
                 }
-                if ((putBytes >= maxSize) && (maxSize > 0)) break;
+                if ((maxSize > 0) && (putBytes >= maxSize)) break;
             }
         }
 
@@ -1152,7 +1143,7 @@ namespace AGS.Editor
             for (int i = 0; i < paletteSize; ++i)
             {
                 byte[] rgb = reader.ReadBytes(4); // byte 4 is 'filler' (not alignment padding, but not apparently used)
-                palette[i] = Color.FromArgb(rgb[0], rgb[1], rgb[2]);
+                palette.Add(Color.FromArgb(rgb[0], rgb[1], rgb[2]));
             }
             int maxSize = reader.ReadInt32();
             long uncompSize = reader.ReadInt32() + reader.BaseStream.Position;
@@ -1212,9 +1203,12 @@ namespace AGS.Editor
                 default:
                     break;
             }
-            bmp = new Bitmap(memoryBuffer[0] / _bpp, memoryBuffer[1], format);
+            // first 8 bytes of memory buffer are (width*bpp) and height
+            int lineWidth = BitConverter.ToInt32(memoryBuffer.ToArray(), 0);
+            int height = BitConverter.ToInt32(memoryBuffer.ToArray(), sizeof(int));
+            bmp = new Bitmap(lineWidth / _bpp, height, format);
             BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadWrite, format);
-            Marshal.Copy(memoryBuffer.ToArray(), 8, bmpData.Scan0, memoryBuffer[0] * memoryBuffer[1]);
+            Marshal.Copy(memoryBuffer.ToArray(), sizeof(int) * 2, bmpData.Scan0, lineWidth * height);
             bmp.UnlockBits(bmpData);
             if (reader.BaseStream.Position != uncompSize) reader.BaseStream.Seek(uncompSize, SeekOrigin.Begin);
             return (int)uncompSize;
@@ -1227,7 +1221,7 @@ namespace AGS.Editor
             line.Capacity = size;
             while (n < size)
             {
-                int ix = reader.ReadByte(); // get index byte
+                int ix = reader.ReadSByte(); // get index byte
                 sbyte bx = (sbyte)ix;
                 if (bx == -128) bx = 0;
                 int i = 1 - bx; // ...run (if (bx < 0))
@@ -1262,6 +1256,35 @@ namespace AGS.Editor
             return (int)reader.BaseStream.Position;
         }
 
+        /// <summary>
+        /// Reads a null-terminated string from a file. You can limit the length of the
+        /// returned string by specifying the 'limit' param. If 'stopAtLimit' is true
+        /// then this function will not read more than limit bytes from the file;
+        /// otherwise it will keep reading until it finds a null character, but it will
+        /// stop appending to the string at the limit.
+        /// </summary>
+        string ReadNullTerminatedString(BinaryReader reader, int limit, bool stopAtLimit)
+        {
+            StringBuilder sb = new StringBuilder(limit);
+            for (byte b = reader.ReadByte(); b != 0; b = reader.ReadByte())
+            {
+                if (sb.Length < limit) sb.Append(b);
+                else if (stopAtLimit) break;
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Returns an ASCII-encoded string from an array of bytes, and truncates the
+        /// string to the index of the first null-terminator (if any).
+        /// </summary>
+        public static string GetNullTerminatedASCIIString(byte[] bytes)
+        {
+            string s = Encoding.ASCII.GetString(bytes);
+            int idx = s.IndexOf((char)0);
+            return s.Substring(0, (idx == -1 ? s.Length : idx));
+        }
+
         RoomLoadError ReadMainBlock(BinaryReader reader)
         {
             if (_loadedVersion >= RoomFileVersion.Version208) _bpp = reader.ReadInt32();
@@ -1285,21 +1308,23 @@ namespace AGS.Editor
                 _hotspots[i].WalkToPoint = new Point(reader.ReadInt16(), reader.ReadInt16());
             }
             int hotspotDescSize = 30;
-            if (_loadedVersion >= RoomFileVersion.Version303A) hotspotDescSize = 2999;
+            bool stopAtLimit = true;
+            if (_loadedVersion >= RoomFileVersion.Version303A)
+            {
+                hotspotDescSize = 2999;
+                stopAtLimit = false;
+            }
             foreach (RoomHotspot hotspot in _hotspots)
             {
-                byte[] bytes = new byte[hotspotDescSize];
-                reader.Read(bytes, 0, hotspotDescSize);
-                hotspot.Description = Encoding.ASCII.GetString(bytes);
+                hotspot.Description = ReadNullTerminatedString(reader, hotspotDescSize, stopAtLimit);
             }
             if (_loadedVersion >= RoomFileVersion.Version270)
             {
                 foreach (RoomHotspot hotspot in _hotspots)
                 {
                     const int MAX_SCRIPT_NAME_LEN = 20; // TODO: remove limit on script names?
-                    byte[] bytes = new byte[MAX_SCRIPT_NAME_LEN];
-                    reader.Read(bytes, 0, MAX_SCRIPT_NAME_LEN);
-                    hotspot.Name = Encoding.ASCII.GetString(bytes);
+                    byte[] bytes = reader.ReadBytes(MAX_SCRIPT_NAME_LEN);
+                    hotspot.Name = GetNullTerminatedASCIIString(bytes);
                 }
             }
             _walkableAreas.Clear();
@@ -1343,7 +1368,7 @@ namespace AGS.Editor
                 {
                     _localVariables.Add(new OldInteractionVariable("IntVar_" + i.ToString(), 0));
                     byte[] bytes = reader.ReadBytes(23);
-                    _localVariables[i].Name = Encoding.ASCII.GetString(bytes);
+                    _localVariables[i].Name = GetNullTerminatedASCIIString(bytes);
                     if (_loadedVersion < RoomFileVersion.Version340Alpha)
                     {
                         // old 'type' variable is unused
@@ -1428,7 +1453,7 @@ namespace AGS.Editor
                 _resolution = (RoomResolution)reader.ReadInt16();
             }
             _walkableAreas.Clear();
-            if (_loadedVersion >= RoomFileVersion.Version240)
+            if (_loadedVersion >= RoomFileVersion.Version240) // TODO: should this be 340Alpha?
             {
                 _walkableAreas.Capacity = reader.ReadInt32();
             }
@@ -1589,6 +1614,10 @@ namespace AGS.Editor
                 LoadCompressedAllegro(reader, out bmp);
                 _backgrounds[0].Graphic = bmp;
             }
+            // DEBUG CODE
+            //MessageBox.Show("Done reading background bmp");
+            //RLDBitmapViewer bv = new RLDBitmapViewer(_backgrounds[0].Graphic);
+            //bv.ShowDialog();
             if ((_backgrounds[0].Graphic.Width > 320) && (_loadedVersion < RoomFileVersion.Version200Final))
             {
                 _resolution = RoomResolution.HighRes;
@@ -1603,9 +1632,11 @@ namespace AGS.Editor
                 LoadCompressedAllegro(reader, out bmp);
                 // an old version, this mask is just deleted anyway
             }
+            //MessageBox.Show("Done reading deleted legacy mask");
             LoadCompressedAllegro(reader, out _walkableAreaMask);
             LoadCompressedAllegro(reader, out _walkBehindMask);
             LoadCompressedAllegro(reader, out _hotspotMask);
+            //MessageBox.Show("Done reading useful masks");
             if (_loadedVersion < RoomFileVersion.Version255B)
             {
                 // old version - copy walkable areas to Regions
@@ -1621,6 +1652,7 @@ namespace AGS.Editor
                     }
                 }
             }
+            //MessageBox.Show("Done copying region mask, et al. Done reading main block.");
             return RoomLoadError.NoError;
         }
 
@@ -1660,7 +1692,7 @@ namespace AGS.Editor
             public bool Read(BinaryReader reader)
             {
                 _instances = 0;
-                string gotSig = Encoding.ASCII.GetString(reader.ReadBytes(4));
+                string gotSig = GetNullTerminatedASCIIString(reader.ReadBytes(4));
                 int fileVer = reader.ReadInt32();
                 if ((gotSig != FILE_SIGNATURE) || (fileVer > SCOM_VERSION))
                 {
@@ -1754,7 +1786,7 @@ namespace AGS.Editor
             {
                 bytes[i] += (byte)password[i % password.Length];
             }
-            _textScript = Encoding.ASCII.GetString(bytes);
+            _textScript = GetNullTerminatedASCIIString(bytes);
             return RoomLoadError.NoError;
         }
 
@@ -1777,7 +1809,7 @@ namespace AGS.Editor
             }
             for (int i = 0; i < _objects.Count; ++i)
             {
-                _objects[i].Name = Encoding.ASCII.GetString(reader.ReadBytes(MAX_OBJECT_NAME_LEN));
+                _objects[i].Name = GetNullTerminatedASCIIString(reader.ReadBytes(MAX_OBJECT_NAME_LEN));
             }
             return RoomLoadError.NoError;
         }
@@ -1852,8 +1884,8 @@ namespace AGS.Editor
                     byte[] name = reader.ReadBytes(LEGACY_MAX_CUSTOM_PROPERTY_NAME_LENGTH);
                     byte[] value = reader.ReadBytes(LEGACY_MAX_CUSTOM_PROPERTY_VALUE_LENGTH);
                     CustomProperty property = new CustomProperty();
-                    property.Name = Encoding.ASCII.GetString(name);
-                    property.Value = Encoding.ASCII.GetString(value);
+                    property.Name = GetNullTerminatedASCIIString(name);
+                    property.Value = GetNullTerminatedASCIIString(value);
                     properties.PropertyValues.Add(property.Name, property);
                 }
             }
@@ -1938,7 +1970,7 @@ namespace AGS.Editor
             }
             for (int i = 0; i < _objects.Count; ++i)
             {
-                string scriptName = Encoding.ASCII.GetString(reader.ReadBytes(MAX_SCRIPT_NAME_LEN));
+                string scriptName = GetNullTerminatedASCIIString(reader.ReadBytes(MAX_SCRIPT_NAME_LEN));
                 // TODO: store this in the object
             }
             return RoomLoadError.NoError;
