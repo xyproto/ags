@@ -6,85 +6,46 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
-//using System.Windows.Forms;
 
 namespace AGS.Editor
 {
     internal class RoomLoader
     {
-        // TODO: Make sure that this all does what it's supposed to.
-        //       I'm not sure of all of it. Especially the image reading bits. -monkey
+        // TODO: Make sure that this all does what it's supposed to. -monkey
 
         // TODO: Split the methods here into other classes and files!
         //       I'm keeping it localized for now to make sure everything fits together
         //       and hopefully works before I distribute the code appropriately.
         //       Porting from native has not been a joke, it's hard work! :) -monkey
 
-        // TODO: A lot of this is duplicates of what's already in the Room class, get it out of here!
-        private static InteractionSchema _interactionSchema;
+        // TODO: probably add these bitmaps to the Room structure.
         private List<RoomBackground> _backgrounds = new List<RoomBackground>();
         private Bitmap _hotspotMask;
-        private List<RoomHotspot> _hotspots = new List<RoomHotspot>();
-        private List<RoomObject> _objects = new List<RoomObject>();
         private Bitmap _regionMask;
-        private List<RoomRegion> _regions = new List<RoomRegion>();
         private Bitmap _walkableAreaMask;
-        private List<RoomWalkableArea> _walkableAreas = new List<RoomWalkableArea>();
         private Bitmap _walkBehindMask;
-        private List<RoomWalkBehind> _walkBehinds = new List<RoomWalkBehind>();
-        private List<string> _messages = new List<string>();
-        private List<MessageInfo> _messageInfos = new List<MessageInfo>();
         private RoomFileVersion _loadedVersion;
-        private int _bpp;
-        private int _edgeTop;
-        private int _edgeBottom;
-        private int _edgeLeft;
-        private int _edgeRight;
-        private int _localVariableCount;
-        private List<OldInteractionVariable> _localVariables = new List<OldInteractionVariable>();
-        private Interactions _interactions = new Interactions(_interactionSchema);
-        private int _width;
-        private int _height;
-        private RoomResolution _resolution;
-        private bool _stateSaving;
+        // TODO: get rid of this array, we can just read the members into the structure.
         private int[] _options = new int[10];
-        private int _gameID;
         private List<Color> _palette = new List<Color>();
-        private int _backgroundAnimationSpeed;
-        private bool _compiledScriptShared;
-        private int _compiledScriptSize;
-        private CompiledScript _compiledScript;
-        private string _textScript;
-        private CustomProperties _properties = new CustomProperties();
+        private CompiledScript _compiledScript; // TODO: this is unused? (I can't find any references in native either)
+        private string _textScript; // TODO: unused?
+        private Room _loadingRoom;
+        /// <summary>
+        /// This is just temporary storage beause Walkable Areas don't have a light level.
+        /// Some legacy files copy this member into regions though.
+        /// </summary>
+        private List<int> _legacyWalkableAreaLightLevel = new List<int>();
 
-        static RoomLoader()
+        /// <summary>
+        /// Various constants used throughout this class.
+        /// This separate class is for scoping purposes only.
+        /// </summary>
+        public static class RoomLoaderConstants
         {
-            // TODO: duplicate of what's in the Room class, just use that instead
-            _interactionSchema = new InteractionSchema(
-                new string[]
-                {
-                    "Walks off left edge",
-                    "Walks off right edge",
-                    "Walks off bottom edge",
-                    "Walks off top edge",
-                    "First time enters room",
-                    "Enters room before fade-in",
-                    "Repeatedly execute",
-                    "Enters room after fade-in",
-                    "Leaves room"
-                },
-                new string[]
-                {
-                    "LeaveLeft",
-                    "LeaveRight",
-                    "LeaveBottom",
-                    "LeaveTop",
-                    "FirstLoad",
-                    "Load",
-                    "RepExec",
-                    "AfterFadein",
-                    "Leave"
-                });
+            public const int MAX_SCRIPT_NAME_LEN = 20;
+            public const int NOT_VECTOR_SCALED = -10000;
+            public const string ROOM_PASSWORD = "Avis Durgan";
         }
 
         public class RoomBackground
@@ -104,6 +65,12 @@ namespace AGS.Editor
             }
 
             public bool PaletteShared
+            {
+                get;
+                set;
+            }
+
+            public int ID
             {
                 get;
                 set;
@@ -170,40 +137,24 @@ namespace AGS.Editor
             _regionMask = null;
             _walkableAreaMask = null;
             _walkBehindMask = null;
-            _messages.Clear();
         }
 
         private void InitializeDefaults()
         {
-            const int NO_GAME_ID_IN_ROOM_FILE = 16325;
+            _loadingRoom = null;
             _loadedVersion = RoomFileVersion.Current;
             _backgrounds.Clear();
             _backgrounds.Add(new RoomBackground());
-            _gameID = NO_GAME_ID_IN_ROOM_FILE;
-            _width = 320;
-            _height = 200;
-            _edgeLeft = 0;
-            _edgeRight = 317;
-            _edgeTop = 40;
-            _edgeBottom = 199;
-            _resolution = RoomResolution.LowRes;
-            _bpp = 1;
-            _hotspots.Clear();
-            _objects.Clear();
-            _regions.Clear();
-            _walkableAreas.Clear();
-            _walkBehinds.Clear();
-            _backgrounds.Clear();
-            _backgrounds.Add(new RoomBackground());
-            _localVariables.Clear();
-            _messages.Clear();
-            _messageInfos.Clear();
+            _backgrounds[0].ID = 0;
+            _hotspotMask = null;
+            _regionMask = null;
+            _walkableAreaMask = null;
+            _walkBehindMask = null;
             _palette.Clear();
-            _stateSaving = true;
             Array.Clear(_options, 0, _options.Length);
-            _backgroundAnimationSpeed = 5;
-            _compiledScriptShared = false;
-            _compiledScriptSize = 0;
+            _compiledScript = null;
+            _textScript = null;
+            _legacyWalkableAreaLightLevel.Clear();
         }
 
         enum RoomFormatBlock
@@ -224,6 +175,12 @@ namespace AGS.Editor
         #region OldInteraction crap
         // TODO: Ideally, optimize most of these classes out entirely.
         //       They are only here now for reading legacy room files. -monkey
+
+        private static class OldInteractionConstants
+        {
+            public const int MAX_ACTION_ARGS = 5;
+            public const int MAX_EVENTS = 30;
+        }
 
         private class OldInteractionValue
         {
@@ -298,7 +255,8 @@ namespace AGS.Editor
                 Commands = new OldInteractionCommand[MAX_COMMANDS_PER_LIST];
             }
 
-            public OldInteractionCommandList(OldInteractionCommandList other) : this()
+            public OldInteractionCommandList(OldInteractionCommandList other)
+                : this()
             {
                 CommandCount = other.CommandCount;
                 TimesRun = other.TimesRun;
@@ -329,8 +287,6 @@ namespace AGS.Editor
 
         private class OldInteractionCommand
         {
-            public const int MAX_ACTION_ARGS = 5;
-
             public enum CommandType
             {
                 Nothing = 0,
@@ -410,7 +366,7 @@ namespace AGS.Editor
             public OldInteractionCommand()
             {
                 Type = 0;
-                Data = new OldInteractionValue[MAX_ACTION_ARGS];
+                Data = new OldInteractionValue[OldInteractionConstants.MAX_ACTION_ARGS];
                 Children = null;
                 Parent = null;
             }
@@ -453,8 +409,6 @@ namespace AGS.Editor
 
         private class OldInteraction
         {
-            public const int MAX_EVENTS = 30;
-
             public int EventCount
             {
                 get;
@@ -482,9 +436,9 @@ namespace AGS.Editor
             public OldInteraction()
             {
                 EventCount = 0;
-                EventTypes = new int[MAX_EVENTS];
-                TimesRun = new int[MAX_EVENTS];
-                Response = new OldInteractionCommandList[MAX_EVENTS];
+                EventTypes = new int[OldInteractionConstants.MAX_EVENTS];
+                TimesRun = new int[OldInteractionConstants.MAX_EVENTS];
+                Response = new OldInteractionCommandList[OldInteractionConstants.MAX_EVENTS];
             }
 
             public OldInteraction(OldInteraction other)
@@ -509,7 +463,7 @@ namespace AGS.Editor
             public void Reset()
             {
                 EventCount = 0;
-                for (int i = 0; i < MAX_EVENTS; ++i)
+                for (int i = 0; i < OldInteractionConstants.MAX_EVENTS; ++i)
                 {
                     EventTypes[i] = 0;
                     TimesRun[i] = 0;
@@ -523,7 +477,7 @@ namespace AGS.Editor
                 // reading these as byte arrays allows us to collapse several loops down to just one
                 byte[] eventBytes = reader.ReadBytes(sizeof(int) * EventTypes.Length);
                 byte[] timesRunBytes = reader.ReadBytes(sizeof(int) * TimesRun.Length);
-                for (int i = 0; i < MAX_EVENTS; ++i)
+                for (int i = 0; i < OldInteractionConstants.MAX_EVENTS; ++i)
                 {
                     EventTypes[i] = BitConverter.ToInt32(eventBytes, i * sizeof(int));
                     TimesRun[i] = BitConverter.ToInt32(timesRunBytes, i * sizeof(int));
@@ -536,7 +490,6 @@ namespace AGS.Editor
         private class OldInteractionAction
         {
             public const int NUM_ACTION_TYPES = 48;
-            public const int MAX_ACTION_ARGS = 5;
 
             public enum ActionArgument
             {
@@ -600,11 +553,12 @@ namespace AGS.Editor
 
             public OldInteractionAction()
             {
-                ArgumentTypes = new ActionArgument[MAX_ACTION_ARGS];
-                ArgumentNames = new string[MAX_ACTION_ARGS];
+                ArgumentTypes = new ActionArgument[OldInteractionConstants.MAX_ACTION_ARGS];
+                ArgumentNames = new string[OldInteractionConstants.MAX_ACTION_ARGS];
             }
 
-            public OldInteractionAction(string name, ActionFlags flags, int argCount, ActionArgument[] argTypes, string[] argNames, string description, string textScript) : this()
+            public OldInteractionAction(string name, ActionFlags flags, int argCount, ActionArgument[] argTypes, string[] argNames, string description, string textScript)
+                : this()
             {
                 Name = name;
                 Flags = flags;
@@ -937,7 +891,7 @@ namespace AGS.Editor
             if (reader.ReadInt32() != 1) return null;
             OldInteraction temp = new OldInteraction();
             temp.EventCount = reader.ReadInt32();
-            if (temp.EventCount > OldInteraction.MAX_EVENTS)
+            if (temp.EventCount > OldInteractionConstants.MAX_EVENTS)
             {
                 throw new AGS.Types.InvalidDataException("Error: this interaction was saved with a newer version of AGS");
             }
@@ -962,59 +916,22 @@ namespace AGS.Editor
 
         private void DeserializeInteractionScripts(BinaryReader reader, Interactions interactions)
         {
-            // TODO: I've botched some old macros into individual functions like this.
-            //       They should really be implemented as class-wide constants. -monkey
-            const int MAX_EVENTS = 30;
             int eventCount = reader.ReadInt32();
-            if (eventCount > MAX_EVENTS) throw new AGS.Types.InvalidDataException("Too many interaction script events");
+            if (eventCount > OldInteractionConstants.MAX_EVENTS) throw new AGS.Types.InvalidDataException("Too many interaction script events");
             for (int i = 0; i < eventCount; ++i)
             {
                 StringBuilder sb = new StringBuilder(200);
                 for (byte b = reader.ReadByte(); b != 0; b = reader.ReadByte())
                 {
-                    if (sb.Length < 200) sb = sb.Append(b > 0 ? b : 0);
+                    if (sb.Length < 200) sb = sb.Append(b);
                 }
                 interactions.ScriptFunctionNames[i] = sb.ToString();
             }
         }
 
-        // TODO: get rid of this class
-        private class MessageInfo
-        {
-            public enum MessageFlags
-            {
-                DisplayNext = 1, // supercedes using Alt-200 at end of message
-                TimeLimit = 2
-            };
-
-            public enum DisplayAs
-            {
-                NormalWindow = 0,
-                Speech = 1
-            };
-
-            public DisplayAs Display
-            {
-                get;
-                set;
-            }
-
-            public MessageFlags Flags
-            {
-                get;
-                set;
-            }
-
-            public void ReadFromFile(BinaryReader reader)
-            {
-                Display = (DisplayAs)reader.ReadByte();
-                Flags = (MessageFlags)reader.ReadByte();
-            }
-        }
-
         string DecryptText(string source)
         {
-            const string password = "Avis Durgan";
+            const string password = RoomLoaderConstants.ROOM_PASSWORD;
             StringBuilder sb = new StringBuilder(source.Length);
             for (int i = 0; i < source.Length; ++i)
             {
@@ -1081,7 +998,6 @@ namespace AGS.Editor
             int UnusedPadding4;
         }
 
-        // TODO: I have no idea what I'm doing. -monkey
         void MyPutC(byte c, int maxSize, ref int putBytes, ref int outBytes, List<byte> memoryBuffer)
         {
             if (maxSize > 0)
@@ -1148,7 +1064,7 @@ namespace AGS.Editor
             int maxSize = reader.ReadInt32();
             long uncompSize = reader.ReadInt32() + reader.BaseStream.Position;
             int outBytes = 0; // TODO: ref params on these mayhaps (depends how they're used elsewhere in relevant code)
-            int putBytes = 0; //       in native these are global vars
+            int putBytes = 0; //       in native these are global vars (otherwise possibly delete them)
             List<byte> memoryBuffer = LZWExpandToMemory(reader, maxSize, ref putBytes, ref outBytes);
             #region AGS_BIG_ENDIAN fixes (TODO: implement?)
             /*
@@ -1188,25 +1104,25 @@ namespace AGS.Editor
              */
             #endregion // AGS_BIG_ENDIAN fixes
             PixelFormat format = PixelFormat.Format16bppRgb565;
-            switch (_bpp) // BYTES per pixel
+            switch (_loadingRoom.ColorDepth) // bits per pixel
             {
                 // TODO: verify these formats as appropriate
-                case 1: // 8-bit
+                case 8:
                     format = PixelFormat.Format8bppIndexed;
                     break;
-                case 2: // 16-bit
+                case 16:
                     format = PixelFormat.Format16bppRgb565;
                     break;
-                case 4: // 32-bit
+                case 32:
                     format = PixelFormat.Format32bppRgb;
                     break;
                 default:
                     break;
             }
-            // first 8 bytes of memory buffer are (width*bpp) and height
+            // first 8 bytes of memory buffer are (width*bpp) and height as 32-bit ints
             int lineWidth = BitConverter.ToInt32(memoryBuffer.ToArray(), 0);
             int height = BitConverter.ToInt32(memoryBuffer.ToArray(), sizeof(int));
-            bmp = new Bitmap(lineWidth / _bpp, height, format);
+            bmp = new Bitmap(lineWidth / (_loadingRoom.ColorDepth / 8), height, format);
             BitmapData bmpData = bmp.LockBits(new Rectangle(0, 0, bmp.Width, bmp.Height), ImageLockMode.ReadWrite, format);
             Marshal.Copy(memoryBuffer.ToArray(), sizeof(int) * 2, bmpData.Scan0, lineWidth * height);
             bmp.UnlockBits(bmpData);
@@ -1216,22 +1132,22 @@ namespace AGS.Editor
 
         int CUnpackBitL(List<byte> line, int size, BinaryReader reader)
         {
-            int n = 0; // number of bytes decoded
             line.Clear();
             line.Capacity = size;
+            int n = 0; // number of bytes decoded
             while (n < size)
             {
-                int ix = reader.ReadSByte(); // get index byte
-                sbyte bx = (sbyte)ix;
+                sbyte bx = reader.ReadSByte(); // get index byte
                 if (bx == -128) bx = 0;
-                int i = 1 - bx; // ...run (if (bx < 0))
-                if (bx >= 0) i = bx + 1; // ...seq
-                while ((i--) != 0)
+                int i = 1 + System.Math.Abs(bx);
+                byte b = reader.ReadByte();
+                for (; i != 0; --i)
                 {
                     // test for buffer overflow
                     if (n >= size) return -1;
-                    line.Add(reader.ReadByte());
                     n++;
+                    line.Add(b);
+                    if (bx >= 0) b = reader.ReadByte(); // seq
                 }
             }
             return 0;
@@ -1287,25 +1203,26 @@ namespace AGS.Editor
 
         RoomLoadError ReadMainBlock(BinaryReader reader)
         {
-            if (_loadedVersion >= RoomFileVersion.Version208) _bpp = reader.ReadInt32();
-            else _bpp = 1;
-            if (_bpp < 1) _bpp = 1;
-            _walkBehinds.Clear();
-            _walkBehinds.Capacity = reader.ReadInt16();
-            for (int i = 0; i < _walkBehinds.Capacity; ++i)
+            int bytesPerPixel = 1;
+            if (_loadedVersion >= RoomFileVersion.Version208) bytesPerPixel = reader.ReadInt32();
+            if (bytesPerPixel < 1) bytesPerPixel = 1;
+            _loadingRoom.ColorDepth = (bytesPerPixel * 8);
+            int walkBehindCount = reader.ReadInt16();
+            _loadingRoom.WalkBehinds.Clear();
+            for (int i = 0; i < walkBehindCount; ++i)
             {
-                _walkBehinds.Add(new RoomWalkBehind());
-                _walkBehinds[i].Baseline = reader.ReadInt16();
+                _loadingRoom.WalkBehinds.Add(new RoomWalkBehind());
+                _loadingRoom.WalkBehinds[i].Baseline = reader.ReadInt16();
+                _loadingRoom.WalkBehinds[i].ID = i;
             }
-            _hotspots.Clear();
-            _hotspots.Capacity = reader.ReadInt32();
-            // FIXME check version? -per existing note from native code-
-            // newer version with dynamic limits shouldn't do this(?)
-            if (_hotspots.Capacity == 0) _hotspots.Capacity = 20;
-            for (int i = 0; i < _hotspots.Capacity; ++i)
+            int hotspotCount = reader.ReadInt32();
+            if (hotspotCount == 0) hotspotCount = 20; // this is NOT the same as legacy max
+            _loadingRoom.Hotspots.Clear();
+            for (int i = 0; i < hotspotCount; ++i)
             {
-                _hotspots.Add(new RoomHotspot(null)); // TODO: change notification?
-                _hotspots[i].WalkToPoint = new Point(reader.ReadInt16(), reader.ReadInt16());
+                _loadingRoom.Hotspots.Add(new RoomHotspot(_loadingRoom));
+                _loadingRoom.Hotspots[i].WalkToPoint = new Point(reader.ReadInt16(), reader.ReadInt16());
+                _loadingRoom.Hotspots[i].ID = i;
             }
             int hotspotDescSize = 30;
             bool stopAtLimit = true;
@@ -1314,225 +1231,213 @@ namespace AGS.Editor
                 hotspotDescSize = 2999;
                 stopAtLimit = false;
             }
-            foreach (RoomHotspot hotspot in _hotspots)
+            foreach (RoomHotspot hotspot in _loadingRoom.Hotspots)
             {
                 hotspot.Description = ReadNullTerminatedString(reader, hotspotDescSize, stopAtLimit);
             }
             if (_loadedVersion >= RoomFileVersion.Version270)
             {
-                foreach (RoomHotspot hotspot in _hotspots)
+                foreach (RoomHotspot hotspot in _loadingRoom.Hotspots)
                 {
-                    const int MAX_SCRIPT_NAME_LEN = 20; // TODO: remove limit on script names?
-                    byte[] bytes = reader.ReadBytes(MAX_SCRIPT_NAME_LEN);
+                    byte[] bytes = reader.ReadBytes(RoomLoaderConstants.MAX_SCRIPT_NAME_LEN);
                     hotspot.Name = GetNullTerminatedASCIIString(bytes);
                 }
             }
-            _walkableAreas.Clear();
-            _walkableAreas.Capacity = reader.ReadInt32();
-            for (int i = 0; i < _walkableAreas.Capacity; ++i)
+            int legacyWallPointCount = reader.ReadInt32();
+            for (int i = 0; i < legacyWallPointCount; ++i)
             {
-                _walkableAreas.Add(new RoomWalkableArea());
-                if (_loadedVersion < RoomFileVersion.Version340Alpha)
-                {
-                    // read legacy WallPoints (never used, only written and read from room file)
-                    // TODO: phase out, remove this from saved file data
-                    const int MAXPOINTS = 30;
-                    // read integers as bytes:
-                    //   MAXPOINT x values
-                    //   MAXPOINT y values
-                    //   1 numpoint value
-                    reader.ReadBytes(sizeof(int) * ((MAXPOINTS * 2) + 1));
-                }
+                // read legacy WallPoints (never used, only written and read from room file)
+                // TODO: phase out, remove this from saved file data
+                const int MAX_POINTS = 30;
+                // read integers as bytes:
+                //   MAXPOINT x values
+                //   MAXPOINT y values
+                //   1 numpoint value
+                reader.ReadBytes(sizeof(int) * ((MAX_POINTS * 2) + 1));
             }
-            _edgeTop = reader.ReadInt16();
-            _edgeBottom = reader.ReadInt16();
-            _edgeLeft = reader.ReadInt16();
-            _edgeRight = reader.ReadInt16();
-            _objects.Clear();
-            _objects.Capacity = reader.ReadInt16();
-            for (int i = 0; i < _objects.Capacity; ++i)
+            _loadingRoom.TopEdgeY = reader.ReadInt16();
+            _loadingRoom.BottomEdgeY = reader.ReadInt16();
+            _loadingRoom.LeftEdgeX = reader.ReadInt16();
+            _loadingRoom.RightEdgeX = reader.ReadInt16();
+            _loadingRoom.Objects.Clear();
+            int objectCount = reader.ReadInt16();
+            for (int i = 0; i < objectCount; ++i)
             {
-                _objects.Add(new RoomObject(null)); // TODO: change notifier?
-                _objects[i].Image = reader.ReadInt16();
-                _objects[i].StartX = reader.ReadInt16();
-                _objects[i].StartY = reader.ReadInt16();
-                _objects[i].ID = reader.ReadInt16();
-                _objects[i].Visible = (reader.ReadInt16() != 0 ? true : false);
+                _loadingRoom.Objects.Add(new RoomObject(_loadingRoom));
+                _loadingRoom.Objects[i].Image = reader.ReadInt16();
+                _loadingRoom.Objects[i].StartX = reader.ReadInt16();
+                _loadingRoom.Objects[i].StartY = reader.ReadInt16();
+                int unusedRoomIndex = reader.ReadInt16(); // TODO: phase out, this isn't used anywhere
+                _loadingRoom.Objects[i].Visible = (reader.ReadInt16() != 0);
+                _loadingRoom.Objects[i].ID = i;
             }
             if (_loadedVersion >= RoomFileVersion.Version253) // TODO: phase out old interaction variables completely for newer versions
             {
-                _localVariableCount = reader.ReadInt32();
-                _localVariables.Clear();
-                _localVariables.Capacity = _localVariableCount;
-                for (int i = 0; i < _localVariableCount; ++i)
+                _loadingRoom.OldInteractionVariables.Clear();
+                int oldInteractionVariableCount = reader.ReadInt32();
+                for (int i = 0; i < oldInteractionVariableCount; ++i)
                 {
-                    _localVariables.Add(new OldInteractionVariable("IntVar_" + i.ToString(), 0));
                     byte[] bytes = reader.ReadBytes(23);
-                    _localVariables[i].Name = GetNullTerminatedASCIIString(bytes);
-                    if (_loadedVersion < RoomFileVersion.Version340Alpha)
-                    {
-                        // old 'type' variable is unused
-                        // TODO: phase out during writing process
-                        reader.ReadByte();
-                    }
-                    _localVariables[i].Value = reader.ReadInt32();
+                    string name = GetNullTerminatedASCIIString(bytes);
+                    reader.ReadByte(); // old 'type' variable is unused
+                    int value = reader.ReadInt32();
+                    _loadingRoom.OldInteractionVariables.Add(new OldInteractionVariable(name, value));
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Version241)
             {
                 if (_loadedVersion < RoomFileVersion.Version300A)
                 {
-                    for (int i = 0; i < _hotspots.Count; ++i)
+                    foreach (RoomHotspot hotspot in _loadingRoom.Hotspots)
                     {
-                        ConvertInteractions(_hotspots[i].Interactions, DeserializeOldInteraction(reader), "hotspot" + i.ToString() + "_", null, 1);
+                        ConvertInteractions(hotspot.Interactions, DeserializeOldInteraction(reader), "hotspot" + hotspot.ID.ToString() + "_", AGSEditor.Instance.CurrentGame, 1);
                     }
-                    for (int i = 0; i < _objects.Count; ++i)
+                    foreach (RoomObject obj in _loadingRoom.Objects)
                     {
-                        ConvertInteractions(_objects[i].Interactions, DeserializeOldInteraction(reader), "object" + i.ToString() + "_", null, 2);
+                        ConvertInteractions(obj.Interactions, DeserializeOldInteraction(reader), "object" + obj.ID.ToString() + "_", AGSEditor.Instance.CurrentGame, 2);
                     }
-                    ConvertInteractions(_interactions, DeserializeOldInteraction(reader), "room_", null, 0);
+                    ConvertInteractions(_loadingRoom.Interactions, DeserializeOldInteraction(reader), "room_", AGSEditor.Instance.CurrentGame, 0);
                 }
                 if (_loadedVersion >= RoomFileVersion.Version255B)
                 {
-                    _regions.Clear();
-                    _regions.Capacity = reader.ReadInt32();
-                    for (int i = 0; i < _regions.Capacity; ++i)
+                    int regionCount = reader.ReadInt32();
+                    _loadingRoom.Regions.Clear();
+                    for (int i = 0; i < regionCount; ++i)
                     {
-                        _regions.Add(new RoomRegion());
+                        _loadingRoom.Regions.Add(new RoomRegion());
+                        _loadingRoom.Regions[i].ID = i;
                         if (_loadedVersion < RoomFileVersion.Version300A)
                         {
-                            ConvertInteractions(_regions[i].Interactions, DeserializeOldInteraction(reader), "region" + i.ToString() + "_", null, 0);
+                            ConvertInteractions(_loadingRoom.Regions[i].Interactions, DeserializeOldInteraction(reader), "region" + i.ToString() + "_", AGSEditor.Instance.CurrentGame, 0);
                         }
                     }
                 }
                 if (_loadedVersion >= RoomFileVersion.Version300A)
                 {
-                    DeserializeInteractionScripts(reader, _interactions);
-                    for (int i = 0; i < _hotspots.Count; ++i)
+                    DeserializeInteractionScripts(reader, _loadingRoom.Interactions);
+                    foreach (RoomHotspot hotspot in _loadingRoom.Hotspots)
                     {
-                        DeserializeInteractionScripts(reader, _hotspots[i].Interactions);
+                        DeserializeInteractionScripts(reader, hotspot.Interactions);
                     }
-                    for (int i = 0; i < _objects.Count; ++i)
+                    foreach (RoomObject obj in _loadingRoom.Objects)
                     {
-                        DeserializeInteractionScripts(reader, _objects[i].Interactions);
+                        DeserializeInteractionScripts(reader, obj.Interactions);
                     }
-                    for (int i = 0; i < _regions.Count; ++i)
+                    foreach (RoomRegion region in _loadingRoom.Regions)
                     {
-                        DeserializeInteractionScripts(reader, _regions[i].Interactions);
+                        DeserializeInteractionScripts(reader, region.Interactions);
                     }
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Version200Alpha)
             {
-                for (int i = 0; i < _objects.Count; ++i)
+                foreach (RoomObject obj in _loadingRoom.Objects)
                 {
-                    _objects[i].Baseline = reader.ReadInt32();
+                    obj.Baseline = reader.ReadInt32();
                 }
-                _width = reader.ReadInt16();
-                _height = reader.ReadInt16();
+                _loadingRoom.Width = reader.ReadInt16();
+                _loadingRoom.Height = reader.ReadInt16();
             }
             if (_loadedVersion >= RoomFileVersion.Version262)
             {
-                for (int i = 0; i < _objects.Count; ++i)
+                foreach (RoomObject obj in _loadingRoom.Objects)
                 {
-                    int flags = reader.ReadInt16(); // TODO: this needs to be stored in the object somewhere!!
-                    // _objects[i].Flags = flags; <-- something like that
-                    /*
-                       #define OBJF_NOINTERACT        1  // not clickable
-                       #define OBJF_NOWALKBEHINDS     2  // ignore walk-behinds
-                       #define OBJF_HASTINT           4  // the tint_* members are valid
-                       #define OBJF_USEREGIONTINTS    8  // obey region tints/light areas
-                       #define OBJF_USEROOMSCALING 0x10  // obey room scaling areas
-                       #define OBJF_SOLID          0x20  // blocks characters from moving
-                       #define OBJF_DELETED        0x40  // object has been deleted
-                     */
+                    int flags = reader.ReadInt16();
+                    obj.UseRoomAreaScaling = ((flags & 0x10) != 0);
+                    obj.UseRoomAreaLighting = ((flags & 8) != 0);
+                    // other object flags are used solely by the runtime engine
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Version200Final)
             {
-                _resolution = (RoomResolution)reader.ReadInt16();
+                _loadingRoom.Resolution = (RoomResolution)reader.ReadInt16();
             }
-            _walkableAreas.Clear();
-            if (_loadedVersion >= RoomFileVersion.Version240) // TODO: should this be 340Alpha?
+            _loadingRoom.WalkableAreas.Clear();
+            int walkableAreaCount = 0;
+            if (_loadedVersion >= RoomFileVersion.Version240)
             {
-                _walkableAreas.Capacity = reader.ReadInt32();
+                walkableAreaCount = reader.ReadInt32();
             }
-            else
+            else walkableAreaCount = Room.LEGACY_MAX_WALKABLE_AREAS;
+            for (int i = 0; i < walkableAreaCount; ++i)
             {
-                const int LEGACY_MAX_WALKABLE_AREAS = 15;
-                _walkableAreas.Capacity = LEGACY_MAX_WALKABLE_AREAS;
-            }
-            for (int i = 0; i < _walkableAreas.Capacity; ++i)
-            {
-                _walkableAreas.Add(new RoomWalkableArea());
+                _loadingRoom.WalkableAreas.Add(new RoomWalkableArea());
+                _loadingRoom.WalkableAreas[i].ID = i;
             }
             if (_loadedVersion >= RoomFileVersion.Version200Alpha7)
             {
-                for (int i = 0; i < _walkableAreas.Count; ++i)
+                foreach (RoomWalkableArea area in _loadingRoom.WalkableAreas)
                 {
-                    _walkableAreas[i].MinScalingLevel = reader.ReadInt16() + 100;
+                    area.MinScalingLevel = reader.ReadInt16();
+                    // NOTE: This isn't the final value for this property, but it will be
+                    // fixed later, in Room.Load. (This is not a TODO, just an annotation)
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Version214)
             {
-                for (int i = 0; i < _walkableAreas.Count; ++i)
+                _legacyWalkableAreaLightLevel.Clear();
+                foreach (RoomWalkableArea area in _loadingRoom.WalkableAreas)
                 {
-                    int light = reader.ReadInt16(); // TODO: store this in the area
-                    // _walkableAreas[i].LightLevel = light; <-- something like that
+                    int light = reader.ReadInt16(); // TODO: this isn't used by the editor, phase it out of writing
+                    _legacyWalkableAreaLightLevel.Add(light); // however, it is used by legacy rooms as the region light level, so hang onto it for now
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Version251)
             {
-                for (int i = 0; i < _walkableAreas.Count; ++i)
+                foreach (RoomWalkableArea area in _loadingRoom.WalkableAreas)
                 {
-                    // TODO: CHECKME, the engine uses these properties weirdly
-                    _walkableAreas[i].MaxScalingLevel = reader.ReadInt16() + 100;
-                    if (_walkableAreas[i].MinScalingLevel == _walkableAreas[i].MaxScalingLevel)
+                    area.MaxScalingLevel = reader.ReadInt16();
+                    if (area.MinScalingLevel == area.MaxScalingLevel)
                     {
-                        _walkableAreas[i].UseContinuousScaling = true;
-                        _walkableAreas[i].MaxScalingLevel = 0;
-                        _walkableAreas[i].ScalingLevel = _walkableAreas[i].MinScalingLevel;
+                        area.MaxScalingLevel = RoomLoaderConstants.NOT_VECTOR_SCALED;
                     }
-                    else _walkableAreas[i].UseContinuousScaling = false;
+                    // NOTE: This isn't the final value for this property, but it will be
+                    // fixed later, in Room.Load. (This is not a TODO, just an annotation)
                 }
-                for (int i = 0; i < _walkableAreas.Count; ++i)
+                foreach (RoomWalkableArea area in _loadingRoom.WalkableAreas)
                 {
-                    int top = reader.ReadInt16(); // TODO: store in area
-                    // _walkableAreas[i].Top = top; <-- something like that
+                    int top = reader.ReadInt16(); // TODO: this isn't used by editor, phase it out of writing
                 }
-                for (int i = 0; i < _walkableAreas.Count; ++i)
+                foreach (RoomWalkableArea area in _loadingRoom.WalkableAreas)
                 {
-                    int bottom = reader.ReadInt16(); // TODO: store in area
-                    // _walkableAreas[i].Bottom = bottom; <-- something like that
+                    int bottom = reader.ReadInt16(); // TODO: this isn't used by editor, phase it out of writing
                 }
                 if (_loadedVersion < RoomFileVersion.Version340Alpha)
                 {
-                    reader.ReadBytes(11); // read the room password (not used)
+                    reader.ReadBytes(RoomLoaderConstants.ROOM_PASSWORD.Length); // read the room password (not used)
                 }
-                else _stateSaving = reader.ReadBoolean();
+                else _loadingRoom.StateSaving = reader.ReadBoolean();
             }
             byte[] options = reader.ReadBytes(_options.Length);
             for (int i = 0; i < _options.Length; ++i)
             {
+                // TODO: read directly into _loadingRoom here instead of delaying it...
                 _options[i] = (int)options[i];
             }
-            _messages.Clear();
-            _messages.Capacity = reader.ReadInt16();
+            _loadingRoom.Messages.Clear();
+            int messageCount = reader.ReadInt16();
+            for (int i = 0; i < messageCount; ++i)
+            {
+                _loadingRoom.Messages.Add(new RoomMessage(i));
+            }
             if (_loadedVersion >= RoomFileVersion.Version272)
             {
-                _gameID = reader.ReadInt32();
+                _loadingRoom.GameID = reader.ReadInt32();
             }
             if (_loadedVersion >= RoomFileVersion.Pre114Version3)
             {
-                _messageInfos.Clear();
-                _messageInfos.Capacity = _messages.Capacity;
-                for (int i = 0; i < _messages.Capacity; ++i)
+                foreach (RoomMessage message in _loadingRoom.Messages)
                 {
-                    _messageInfos[i].ReadFromFile(reader);
+                    int display = reader.ReadByte();
+                    int flags = reader.ReadByte();
+                    message.ShowAsSpeech = (display > 0);
+                    message.CharacterID = ((int)display - 1); // ...what? apparently this only returns -1 or 0
+                    message.DisplayNextMessageAfter = ((flags & 1) != 0);
+                    message.AutoRemoveAfterTime = ((flags & 2) != 0);
                 }
             }
             string messageBuffer = null;
-            for (int i = 0; i < _messages.Capacity; ++i)
+            foreach (RoomMessage message in _loadingRoom.Messages)
             {
                 if (_loadedVersion >= RoomFileVersion.Version261)
                 {
@@ -1542,9 +1447,9 @@ namespace AGS.Editor
                 if ((messageBuffer.Length > 0) && (messageBuffer[messageBuffer.Length - 1] == (char)200))
                 {
                     messageBuffer = messageBuffer.Substring(0, messageBuffer.Length - 1);
-                    _messageInfos[i].Flags |= MessageInfo.MessageFlags.DisplayNext;
-                    _messages[i] = messageBuffer;
+                    message.DisplayNextMessageAfter = true;
                 }
+                message.Text = messageBuffer;
             }
             if (_loadedVersion >= RoomFileVersion.Pre114Version6)
             {
@@ -1562,6 +1467,7 @@ namespace AGS.Editor
             }
             if ((_loadedVersion >= RoomFileVersion.Pre114Version4) && (_loadedVersion < RoomFileVersion.Version250A))
             {
+                // none of this is actually implemented
                 if (reader.ReadInt32() != 1) throw new AGS.Types.InvalidDataException("ScriptEdit: invalid config version");
                 int numVarNames = reader.ReadInt32();
                 for (int i = 0; i < numVarNames; ++i)
@@ -1580,26 +1486,29 @@ namespace AGS.Editor
             }
             if (_loadedVersion >= RoomFileVersion.Version114)
             {
-                for (int i = 0; i < _walkableAreas.Count; ++i)
+                foreach (RoomWalkableArea area in _loadingRoom.WalkableAreas)
                 {
-                    int shadingView = reader.ReadInt16(); // TODO: store this in the structure if it's being used
-                    // _walkableAreas[i].ShadingView = shadingView; <-- like that
+                    area.AreaSpecificView = reader.ReadInt16();
                 }
-                const int LEGACY_MAX_ROOM_WALKAREAS = 15;
-                for (int i = _walkableAreas.Count; i < (LEGACY_MAX_ROOM_WALKAREAS + 1); ++i)
+                for (int i = _loadingRoom.WalkableAreas.Count; i < Room.LEGACY_MAX_WALKABLE_AREAS; ++i)
                 {
-                    reader.ReadInt16();
+                    reader.ReadInt16(); // read any leftover unused data from legacy room files
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Version255B)
             {
-                for (int i = 0; i < _regions.Count; ++i)
+                foreach (RoomRegion region in _loadingRoom.Regions)
                 {
-                    _regions[i].LightLevel = reader.ReadInt16();
+                    region.LightLevel = reader.ReadInt16();
                 }
-                for (int i = 0; i < _regions.Count; ++i)
+                foreach (RoomRegion region in _loadingRoom.Regions)
                 {
-                    int tint = reader.ReadInt32(); // TODO: split between Region.RedTint, GreenTint, and BlueTint
+                    const uint TINT_IS_ENABLED = 0x80000000;
+                    int tint = reader.ReadInt32();
+                    region.UseColourTint = ((tint & TINT_IS_ENABLED) != 0);
+                    region.BlueTint = (tint >> 16) & 0x00FF;
+                    region.GreenTint = (tint >> 8) & 0x00FF;
+                    region.RedTint = tint & 0x00FF;
                 }
             }
             if (_loadedVersion >= RoomFileVersion.Pre114Version5)
@@ -1614,13 +1523,9 @@ namespace AGS.Editor
                 LoadCompressedAllegro(reader, out bmp);
                 _backgrounds[0].Graphic = bmp;
             }
-            // DEBUG CODE
-            //MessageBox.Show("Done reading background bmp");
-            //RLDBitmapViewer bv = new RLDBitmapViewer(_backgrounds[0].Graphic);
-            //bv.ShowDialog();
             if ((_backgrounds[0].Graphic.Width > 320) && (_loadedVersion < RoomFileVersion.Version200Final))
             {
-                _resolution = RoomResolution.HighRes;
+                _loadingRoom.Resolution = RoomResolution.HighRes;
             }
             if (_loadedVersion >= RoomFileVersion.Version255B)
             {
@@ -1632,27 +1537,24 @@ namespace AGS.Editor
                 LoadCompressedAllegro(reader, out bmp);
                 // an old version, this mask is just deleted anyway
             }
-            //MessageBox.Show("Done reading deleted legacy mask");
             LoadCompressedAllegro(reader, out _walkableAreaMask);
             LoadCompressedAllegro(reader, out _walkBehindMask);
             LoadCompressedAllegro(reader, out _hotspotMask);
-            //MessageBox.Show("Done reading useful masks");
             if (_loadedVersion < RoomFileVersion.Version255B)
             {
                 // old version - copy walkable areas to Regions
                 if (_regionMask == null)
                 {
                     _regionMask = new Bitmap(_walkableAreaMask);
-                    _regions.Clear();
-                    _regions.Capacity = _walkableAreas.Count;
-                    for (int i = 0; i < _regions.Capacity; ++i)
+                    _loadingRoom.Regions.Clear();
+                    for (int i = 0; i < _loadingRoom.WalkableAreas.Count; ++i)
                     {
-                        _regions.Add(new RoomRegion());
-                        // TODO: copy light level? RoomWalkableArea doesn't have a LightLevel property
+                        _loadingRoom.Regions.Add(new RoomRegion());
+                        _loadingRoom.Regions[i].LightLevel = _legacyWalkableAreaLightLevel[i];
+                        _loadingRoom.Regions[i].ID = i;
                     }
                 }
             }
-            //MessageBox.Show("Done copying region mask, et al. Done reading main block.");
             return RoomLoadError.NoError;
         }
 
@@ -1663,7 +1565,7 @@ namespace AGS.Editor
             return sb.ToString();
         }
 
-        private class CompiledScript // TODO: implement AGS.Types.ICompiledScript? (it's seemingly unused ATM)
+        private class CompiledScript
         {
             public const string FILE_SIGNATURE = "SCOM";
             public const int SCOM_VERSION = 89;
@@ -1677,7 +1579,7 @@ namespace AGS.Editor
             List<string> _imports;
             List<string> _exports;
             List<int> _exportAddresses; // high byte is type; low 24-bits are offset
-            int _instances;
+            //int _instances;
             // 'sections' allow the interpreter to find out which bit
             // of the code came from header files, and which from the main file
             List<string> _sectionNames;
@@ -1691,7 +1593,7 @@ namespace AGS.Editor
 
             public bool Read(BinaryReader reader)
             {
-                _instances = 0;
+                //_instances = 0;
                 string gotSig = GetNullTerminatedASCIIString(reader.ReadBytes(4));
                 int fileVer = reader.ReadInt32();
                 if ((gotSig != FILE_SIGNATURE) || (fileVer > SCOM_VERSION))
@@ -1712,7 +1614,7 @@ namespace AGS.Editor
                     byte[] bytes = reader.ReadBytes(_code.Capacity * sizeof(int));
                     for (int i = 0; i < _code.Capacity; ++i)
                     {
-                        _code[i] = BitConverter.ToInt32(bytes, i * sizeof(int));
+                        _code.Add(BitConverter.ToInt32(bytes, i * sizeof(int)));
                     }
                 }
                 else _code = null;
@@ -1726,7 +1628,7 @@ namespace AGS.Editor
                     byte[] bytes = reader.ReadBytes(_fixUps.Capacity * sizeof(int));
                     for (int i = 0; i < _fixUps.Capacity; ++i)
                     {
-                        _fixUps[i] = BitConverter.ToInt32(bytes, i * sizeof(int));
+                        _fixUps.Add(BitConverter.ToInt32(bytes, i * sizeof(int)));
                     }
                 }
                 else
@@ -1779,7 +1681,7 @@ namespace AGS.Editor
 
         RoomLoadError ReadScriptBlock(BinaryReader reader)
         {
-            const string password = "Avis Durgan";
+            const string password = RoomLoaderConstants.ROOM_PASSWORD;
             int scriptLength = reader.ReadInt32();
             byte[] bytes = reader.ReadBytes(scriptLength);
             for (int i = 0; i < scriptLength; ++i)
@@ -1794,7 +1696,7 @@ namespace AGS.Editor
         {
             const int MAX_OBJECT_NAME_LEN = 30;
             int count = reader.ReadByte();
-            if (_loadedVersion >= RoomFileVersion.Version340Alpha)
+            if (_loadedVersion > RoomFileVersion.Version340Alpha)
             {
                 // allow more than 255 object names in room file
                 // TODO: when writing room file save this count as Int32 not Byte (aka UInt8)
@@ -1803,36 +1705,42 @@ namespace AGS.Editor
                 bytes[0] = (byte)count;
                 count = BitConverter.ToInt32(bytes, 0);
             }
-            if (count != _objects.Count)
+            if (count != _loadingRoom.Objects.Count)
             {
                 return RoomLoadError.InconsistentDataForObjectNames;
             }
-            for (int i = 0; i < _objects.Count; ++i)
+            foreach (RoomObject obj in _loadingRoom.Objects)
             {
-                _objects[i].Name = GetNullTerminatedASCIIString(reader.ReadBytes(MAX_OBJECT_NAME_LEN));
+                obj.Description = GetNullTerminatedASCIIString(reader.ReadBytes(MAX_OBJECT_NAME_LEN));
             }
             return RoomLoadError.NoError;
         }
 
         RoomLoadError ReadAnimatedBackgroundBlock(BinaryReader reader)
         {
-            _backgrounds.Capacity = reader.ReadByte();
-            _backgroundAnimationSpeed = reader.ReadByte();
-            while (_backgrounds.Count < _backgrounds.Capacity) _backgrounds.Add(new RoomBackground());
+            _loadingRoom.BackgroundCount = reader.ReadByte();
+            _backgrounds.Capacity = _loadingRoom.BackgroundCount;
+            _loadingRoom.BackgroundAnimationDelay = reader.ReadByte();
+            while (_backgrounds.Count < _loadingRoom.BackgroundCount)
+            {
+                _backgrounds.Add(new RoomBackground());
+                _backgrounds[_backgrounds.Count - 1].ID = (_backgrounds.Count - 1);
+            }
             if (_loadedVersion >= RoomFileVersion.Version255A)
             {
-                for (int i = 0; i < _backgrounds.Count; ++i)
+                foreach (RoomBackground bkg in _backgrounds)
                 {
-                    _backgrounds[i].PaletteShared = (reader.ReadByte() != 0);
+                    bkg.PaletteShared = (reader.ReadByte() != 0);
                 }
             }
-            for (int i = 1; i < _backgrounds.Count; ++i)
+            foreach (RoomBackground bkg in _backgrounds)
             {
+                if (bkg.ID == 0) continue;
                 Bitmap bmp;
-                List<Color> pal = _backgrounds[i].Palette;
+                List<Color> pal = bkg.Palette;
                 LoadLZW(reader, out bmp, ref pal);
-                _backgrounds[i].Palette = pal;
-                _backgrounds[i].Graphic = bmp;
+                bkg.Palette = pal;
+                bkg.Graphic = bmp;
             }
             return RoomLoadError.NoError;
         }
@@ -1840,7 +1748,6 @@ namespace AGS.Editor
         RoomLoadError ReadCompiledScriptBlock(BinaryReader reader)
         {
             _compiledScript = CompiledScript.CreateFromFile(reader);
-            _compiledScriptShared = false;
             return (_compiledScript == null ? RoomLoadError.ScriptLoadFailed : RoomLoadError.NoError);
         }
 
@@ -1856,18 +1763,11 @@ namespace AGS.Editor
             Version340,
             Current = Version340
         };
-        /*
-         *enum CustomPropertyType
-{
-    kCustomPropertyUndefined = 0,
-    kCustomPropertyBoolean,
-    kCustomPropertyInteger,
-    kCustomPropertyString
-};
-         */
 
         CustomPropertiesError UnserializeCustomProperties(BinaryReader reader, ref CustomProperties properties)
         {
+            const int LEGACY_MAX_CUSTOM_PROPERTY_NAME_LENGTH = 200;
+            const int LEGACY_MAX_CUSTOM_PROPERTY_VALUE_LENGTH = 500;
             CustomPropertiesVersion version = (CustomPropertiesVersion)reader.ReadInt32();
             if ((version < CustomPropertiesVersion.Pre340) || (version > CustomPropertiesVersion.Current))
             {
@@ -1875,8 +1775,6 @@ namespace AGS.Editor
             }
             properties.PropertyValues.Clear();
             int count = reader.ReadInt32(); // Dictionary<,> doesn't have a Capacity but it doesn't really matter to us here
-            const int LEGACY_MAX_CUSTOM_PROPERTY_NAME_LENGTH = 200;
-            const int LEGACY_MAX_CUSTOM_PROPERTY_VALUE_LENGTH = 500;
             if (version == CustomPropertiesVersion.Pre340)
             {
                 for (int i = 0; i < count; ++i)
@@ -1909,13 +1807,19 @@ namespace AGS.Editor
         RoomLoadError ReadPropertiesBlock(BinaryReader reader)
         {
             if (reader.ReadInt32() != 1) return RoomLoadError.PropertiesFormatNotSupported;
-            if (UnserializeCustomProperties(reader, ref _properties) != CustomPropertiesError.NoError)
+            CustomProperties properties = _loadingRoom.Properties;
+            if (UnserializeCustomProperties(reader, ref properties) != CustomPropertiesError.NoError)
             {
                 return RoomLoadError.PropertiesLoadFailed;
             }
-            for (int i = 0; i < _hotspots.Count; ++i)
+            _loadingRoom.Properties.PropertyValues.Clear();
+            foreach (CustomProperty property in properties.PropertyValues.Values)
             {
-                CustomProperties properties = _hotspots[i].Properties;
+                _loadingRoom.Properties.PropertyValues.Add(property.Name, property);
+            }
+            foreach (RoomHotspot hotspot in _loadingRoom.Hotspots)
+            {
+                properties = hotspot.Properties;
                 if (UnserializeCustomProperties(reader, ref properties) != CustomPropertiesError.NoError)
                 {
                     return RoomLoadError.PropertiesLoadFailed;
@@ -1924,27 +1828,27 @@ namespace AGS.Editor
                 {
                     // by the time anything is read into our temporary, no errors are returned
                     // otherwise we'd need to copy this in case of error also
-                    _hotspots[i].Properties.PropertyValues.Clear();
+                    hotspot.Properties.PropertyValues.Clear();
                     // RoomHotspot.Properties setter isn't publicly accessible? urgh!
                     foreach (CustomProperty property in properties.PropertyValues.Values) // CustomProperties isn't directly enumerable?? wut?
                     {
-                        _hotspots[i].Properties.PropertyValues.Add(property.Name, property);
+                        hotspot.Properties.PropertyValues.Add(property.Name, property);
                     }
                 }
             }
-            for (int i = 0; i < _objects.Count; ++i)
+            foreach (RoomObject obj in _loadingRoom.Objects)
             {
-                CustomProperties properties = _objects[i].Properties;
+                properties = obj.Properties;
                 if (UnserializeCustomProperties(reader, ref properties) != CustomPropertiesError.NoError)
                 {
                     return RoomLoadError.PropertiesLoadFailed;
                 }
                 else
                 {
-                    _objects[i].Properties.PropertyValues.Clear();
+                    obj.Properties.PropertyValues.Clear();
                     foreach (CustomProperty property in properties.PropertyValues.Values)
                     {
-                        _objects[i].Properties.PropertyValues.Add(property.Name, property);
+                        obj.Properties.PropertyValues.Add(property.Name, property);
                     }
                 }
             }
@@ -1953,9 +1857,8 @@ namespace AGS.Editor
 
         RoomLoadError ReadObjectScriptNamesBlock(BinaryReader reader)
         {
-            const int MAX_SCRIPT_NAME_LEN = 20;
             int count = reader.ReadByte();
-            if (_loadedVersion >= RoomFileVersion.Version340Alpha)
+            if (_loadedVersion > RoomFileVersion.Version340Alpha)
             {
                 // allow more than 255 object names in room file
                 // TODO: when writing room file save this count as Int32 not Byte (aka UInt8)
@@ -1964,14 +1867,13 @@ namespace AGS.Editor
                 bytes[0] = (byte)count;
                 count = BitConverter.ToInt32(bytes, 0);
             }
-            if (count != _objects.Count)
+            if (count != _loadingRoom.Objects.Count)
             {
                 return RoomLoadError.InconsistentDataForObjectScriptNames;
             }
-            for (int i = 0; i < _objects.Count; ++i)
+            foreach (RoomObject obj in _loadingRoom.Objects)
             {
-                string scriptName = GetNullTerminatedASCIIString(reader.ReadBytes(MAX_SCRIPT_NAME_LEN));
-                // TODO: store this in the object
+                obj.Name = GetNullTerminatedASCIIString(reader.ReadBytes(RoomLoaderConstants.MAX_SCRIPT_NAME_LEN));
             }
             return RoomLoadError.NoError;
         }
@@ -2022,7 +1924,7 @@ namespace AGS.Editor
             return RoomLoadError.NoError;
         }
 
-        void ProcessAfterRead(int id, bool gameIsHighRes)
+        void ProcessAfterRead(int roomNumber, bool gameIsHighRes)
         {
             _backgrounds[0].Palette.Clear();
             _backgrounds[0].Palette.AddRange(_palette);
@@ -2031,62 +1933,76 @@ namespace AGS.Editor
                 // Pre-3.0.3, multiply up co-ordinates
                 // If you change this, also change convert_room_coordinates_to_low res
                 // function in the engine
-                foreach (RoomObject obj in _objects)
+                foreach (RoomObject obj in _loadingRoom.Objects)
                 {
                     obj.StartX <<= 1;
                     obj.StartY <<= 1;
                     if (obj.Baseline > 0) obj.Baseline <<= 1;
                 }
-                foreach (RoomHotspot hot in _hotspots)
+                foreach (RoomHotspot hotspot in _loadingRoom.Hotspots)
                 {
-                    hot.WalkToPoint = new Point(hot.WalkToPoint.X << 1, hot.WalkToPoint.Y << 1);
+                    hotspot.WalkToPoint = new Point(hotspot.WalkToPoint.X << 1, hotspot.WalkToPoint.Y << 1);
                 }
-                foreach (RoomWalkBehind walkBehind in _walkBehinds)
+                foreach (RoomWalkBehind walkBehind in _loadingRoom.WalkBehinds)
                 {
                     walkBehind.Baseline <<= 1;
                 }
-                _edgeLeft <<= 1;
-                _edgeTop <<= 1;
-                _edgeBottom <<= 1;
-                _edgeRight <<= 1;
-                _width <<= 1;
-                _height <<= 1;
+                _loadingRoom.LeftEdgeX <<= 1;
+                _loadingRoom.TopEdgeY <<= 1;
+                _loadingRoom.BottomEdgeY <<= 1;
+                _loadingRoom.RightEdgeX <<= 1;
+                _loadingRoom.Width <<= 1;
+                _loadingRoom.Height <<= 1;
             }
             if (_loadedVersion < RoomFileVersion.Version340Alpha)
             {
-                const int LEGACY_MAX_SAVE_STATE_ROOMS = 300;
-                _stateSaving = (id <= LEGACY_MAX_SAVE_STATE_ROOMS);
+                _loadingRoom.StateSaving = (roomNumber <= Room.LEGACY_NON_STATE_SAVING_INDEX);
             }
         }
 
-        private RoomLoadError ReadFromFile(BinaryReader reader, int id, bool gameIsHighRes, ref RoomFormatBlock lastBlock)
+        private RoomLoadError ReadFromFile(BinaryReader reader, int roomNumber, bool gameIsHighRes, ref RoomFormatBlock lastBlock)
         {
             Free();
             if (reader == null) return RoomLoadError.InternalLogicError;
             InitializeDefaults();
+            _loadingRoom = new Room(roomNumber);
             _loadedVersion = (RoomFileVersion)reader.ReadInt16();
             if ((_loadedVersion < RoomFileVersion.Version250B) || (_loadedVersion > RoomFileVersion.Current))
             {
                 return RoomLoadError.FormatNotSupported;
             }
             RoomFormatBlock blockType = RoomFormatBlock.None;
-            while (blockType != RoomFormatBlock.End)
+            while (true)
             {
                 blockType = (RoomFormatBlock)reader.ReadByte();
                 lastBlock = blockType;
                 if (blockType < 0) return RoomLoadError.UnexpectedEOF;
+                if (blockType == RoomFormatBlock.End) break;
                 RoomLoadError error = ReadBlock(reader, blockType);
                 if (error != RoomLoadError.NoError)
                 {
                     return error;
                 }
             }
-            ProcessAfterRead(id, gameIsHighRes);
+            ProcessAfterRead(roomNumber, gameIsHighRes);
             return RoomLoadError.NoError;
         }
 
-        public Room Load(int roomNumber, string filename, int id, bool gameIsHighRes)
+        enum RoomOptions
         {
+            StartUpMusic,
+            SaveLoadDisabled,
+            PlayerCharacterDisabled,
+            PlayerCharacterView,
+            MusicVolume,
+            MAX_ROOM_OPTIONS = 10
+        };
+
+        public Room Load(UnloadedRoom roomToLoad)
+        {
+            string filename = roomToLoad.FileName;
+            AGSEditor editor = AGSEditor.Instance;
+            bool gameIsHighRes = (editor.CurrentGame.Settings.Resolution > GameResolutions.R320x240);
             FileStream fstream = File.Open(filename, FileMode.Open, FileAccess.Read);
             if (fstream == null)
             {
@@ -2097,7 +2013,7 @@ namespace AGS.Editor
             }
             BinaryReader reader = new BinaryReader(fstream);
             RoomFormatBlock lastBlock = RoomFormatBlock.None;
-            RoomLoadError loadError = ReadFromFile(reader, id, gameIsHighRes, ref lastBlock);
+            RoomLoadError loadError = ReadFromFile(reader, roomToLoad.Number, gameIsHighRes, ref lastBlock);
             reader.BaseStream.Close();
             switch (loadError)
             {
@@ -2125,9 +2041,52 @@ namespace AGS.Editor
                 default:
                     break;
             }
-            Room room = new Room(roomNumber);
-            // TODO: copy data from here to Room object
-            return room;
+            _loadingRoom.Description = roomToLoad.Description;
+            _loadingRoom.Script = roomToLoad.Script;
+            _loadingRoom.MusicVolumeAdjustment = (RoomVolumeAdjustment)_options[(int)RoomOptions.MusicVolume];
+            _loadingRoom.PlayerCharacterView = _options[(int)RoomOptions.PlayerCharacterView];
+            _loadingRoom.PlayMusicOnRoomLoad = _options[(int)RoomOptions.StartUpMusic];
+            _loadingRoom.SaveLoadEnabled = (_options[(int)RoomOptions.SaveLoadDisabled] == 0);
+            _loadingRoom.ShowPlayerCharacter = (_options[(int)RoomOptions.PlayerCharacterDisabled] == 0);
+            foreach (RoomObject obj in _loadingRoom.Objects)
+            {
+                if (!string.IsNullOrEmpty(obj.Name))
+                {
+                    if (_loadedVersion < RoomFileVersion.Version300A)
+                    {
+                        StringBuilder jibbledScriptName = new StringBuilder(obj.Name.Length + 1);
+                        jibbledScriptName.Append("o" + obj.Name.ToLower());
+                        jibbledScriptName[1] = jibbledScriptName[1].ToString().ToUpper()[0];
+                        obj.Name = jibbledScriptName.ToString();
+                    }
+                }
+                if (_loadedVersion <= RoomFileVersion.Version300A)
+                {
+                    Sprite spr = editor.CurrentGame.RootSpriteFolder.FindSpriteByID(obj.Image, true);
+                    if (spr != null) obj.StartY += spr.Height;
+                }
+            }
+            foreach (RoomWalkableArea area in _loadingRoom.WalkableAreas)
+            {
+                int zoom = area.MinScalingLevel;
+                int zoom2 = area.MaxScalingLevel;
+                area.UseContinuousScaling = (zoom2 != RoomLoaderConstants.NOT_VECTOR_SCALED);
+                area.ScalingLevel = zoom + 100;
+                area.MinScalingLevel = zoom + 100;
+                if (area.UseContinuousScaling)
+                {
+                    area.MaxScalingLevel = zoom2 + 100;
+                }
+                else area.MaxScalingLevel = area.MinScalingLevel;
+            }
+            foreach (RoomRegion region in _loadingRoom.Regions)
+            {
+                region.TintSaturation = (region.LightLevel > 0 ? region.LightLevel : 50);
+                region.LightLevel += 100;
+            }
+            // TODO: room._roomStructPtr? this should probably be phased out
+            // (from native) room->_roomStructPtr = (IntPtr)&thisroom;
+            return _loadingRoom;
         }
     }
 }
