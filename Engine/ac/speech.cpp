@@ -12,12 +12,92 @@
 //
 //=============================================================================
 
+#include "ac/common.h"
+#include "ac/runtime_defines.h"
+#include "ac/speech.h"
+
+int user_to_internal_skip_speech(SkipSpeechStyle userval)
+{
+    switch (userval)
+    {
+    case kSkipSpeechKeyMouseTime:
+        return SKIP_AUTOTIMER | SKIP_KEYPRESS | SKIP_MOUSECLICK;
+    case kSkipSpeechKeyTime:
+        return SKIP_AUTOTIMER | SKIP_KEYPRESS;
+    case kSkipSpeechTime:
+        return SKIP_AUTOTIMER;
+    case kSkipSpeechKeyMouse:
+        return SKIP_KEYPRESS | SKIP_MOUSECLICK;
+    case kSkipSpeechMouseTime:
+        return SKIP_AUTOTIMER | SKIP_MOUSECLICK;
+    case kSkipSpeechKey:
+        return SKIP_KEYPRESS;
+    case kSkipSpeechMouse:
+        return SKIP_MOUSECLICK;
+    default:
+        quit("user_to_internal_skip_speech: unknown userval");
+        return 0;
+    }
+}
+
+SkipSpeechStyle internal_skip_speech_to_user(int internal_val)
+{
+    if (internal_val & SKIP_AUTOTIMER)
+    {
+        internal_val &= ~SKIP_AUTOTIMER;
+        if (internal_val == (SKIP_KEYPRESS | SKIP_MOUSECLICK))
+        {
+            return kSkipSpeechKeyMouseTime;
+        }
+        else if (internal_val == SKIP_KEYPRESS)
+        {
+            return kSkipSpeechKeyTime;
+        }
+        else if (internal_val == SKIP_MOUSECLICK)
+        {
+            return kSkipSpeechMouseTime;
+        }
+    }
+    else
+    {
+        if (internal_val == (SKIP_KEYPRESS | SKIP_MOUSECLICK))
+        {
+            return kSkipSpeechKeyMouse;
+        }
+        else if (internal_val == SKIP_KEYPRESS)
+        {
+            return kSkipSpeechKey;
+        }
+        else if (internal_val == SKIP_MOUSECLICK)
+        {
+            return kSkipSpeechMouse;
+        }
+    }
+    return kSkipSpeechUndefined;
+}
+
+//=============================================================================
+//
+// Script API Functions
+//
+//=============================================================================
+
 #include "ac/global_audio.h"
 #include "ac/global_display.h"
 #include "debug/out.h"
 #include "game/game_objects.h"
 #include "script/script_api.h"
 #include "script/script_runtime.h"
+
+RuntimeScriptValue Sc_Speech_GetAnimationStopTimeMargin(const RuntimeScriptValue *params, int32_t param_count)
+{
+    API_VARGET_INT(play.close_mouth_speech_time);
+}
+
+RuntimeScriptValue Sc_Speech_SetAnimationStopTimeMargin(const RuntimeScriptValue *params, int32_t param_count)
+{
+    API_VARSET_PINT(play.close_mouth_speech_time);
+}
 
 RuntimeScriptValue Sc_Speech_GetCustomPortraitPlacement(const RuntimeScriptValue *params, int32_t param_count)
 {
@@ -27,6 +107,28 @@ RuntimeScriptValue Sc_Speech_GetCustomPortraitPlacement(const RuntimeScriptValue
 RuntimeScriptValue Sc_Speech_SetCustomPortraitPlacement(const RuntimeScriptValue *params, int32_t param_count)
 {
     API_VARSET_PINT(play.SpeechPortraitPlacement);
+}
+
+RuntimeScriptValue Sc_Speech_GetDisplayPostTimeMs(const RuntimeScriptValue *params, int32_t param_count)
+{
+    API_VARGET_INT(play.speech_display_post_time_ms);
+}
+
+RuntimeScriptValue Sc_Speech_SetDisplayPostTimeMs(const RuntimeScriptValue *params, int32_t param_count)
+{
+    API_VARSET_PINT(play.speech_display_post_time_ms);
+}
+
+RuntimeScriptValue Sc_Speech_GetGlobalSpeechAnimationDelay(const RuntimeScriptValue *params, int32_t param_count)
+{
+	API_VARGET_INT(play.talkanim_speed);
+}
+
+RuntimeScriptValue Sc_Speech_SetGlobalSpeechAnimationDelay(const RuntimeScriptValue *params, int32_t param_count)
+{
+	if (game.options[OPT_GLOBALTALKANIMSPD] == 0)
+		quit("!Speech.GlobalSpeechAnimationDelay cannot be set when global speech animation speed is not enabled; set Speech.UseGlobalSpeechAnimationDelay first!");
+	API_VARSET_PINT(play.talkanim_speed);
 }
 
 RuntimeScriptValue Sc_Speech_GetPortraitXOffset(const RuntimeScriptValue *params, int32_t param_count)
@@ -66,7 +168,7 @@ RuntimeScriptValue Sc_Speech_SetSkipKey(const RuntimeScriptValue *params, int32_
     API_VARSET_PINT(play.SpeechSkipKey);
 }
 
-RuntimeScriptValue Sc_Speech_GetSkipType(const RuntimeScriptValue *params, int32_t param_count)
+RuntimeScriptValue Sc_Speech_GetSkipStyle(const RuntimeScriptValue *params, int32_t param_count)
 {
     API_SCALL_INT(GetSkipSpeech);
 }
@@ -83,6 +185,16 @@ RuntimeScriptValue Sc_Speech_SetTextAlignment(const RuntimeScriptValue *params, 
     API_VARSET_PINT(play.SpeechTextAlignment);
 }
 
+RuntimeScriptValue Sc_Speech_GetUseGlobalSpeechAnimationDelay(const RuntimeScriptValue *params, int32_t param_count)
+{
+	API_VARGET_INT(game.options[OPT_GLOBALTALKANIMSPD]);
+}
+
+RuntimeScriptValue Sc_Speech_SetUseGlobalSpeechAnimationDelay(const RuntimeScriptValue *params, int32_t param_count)
+{
+	API_VARSET_PINT(game.options[OPT_GLOBALTALKANIMSPD]);
+}
+
 RuntimeScriptValue Sc_Speech_GetVoiceMode(const RuntimeScriptValue *params, int32_t param_count)
 {
     API_SCALL_INT(GetVoiceMode);
@@ -92,20 +204,28 @@ extern RuntimeScriptValue Sc_SetVoiceMode(const RuntimeScriptValue *params, int3
 
 void RegisterSpeechAPI()
 {
+    ccAddExternalStaticFunction("Speech::get_AnimationStopTimeMargin", Sc_Speech_GetAnimationStopTimeMargin);
+    ccAddExternalStaticFunction("Speech::set_AnimationStopTimeMargin", Sc_Speech_SetAnimationStopTimeMargin);
     ccAddExternalStaticFunction("Speech::get_CustomPortraitPlacement", Sc_Speech_GetCustomPortraitPlacement);
     ccAddExternalStaticFunction("Speech::set_CustomPortraitPlacement", Sc_Speech_SetCustomPortraitPlacement);
+    ccAddExternalStaticFunction("Speech::get_DisplayPostTimeMs",      Sc_Speech_GetDisplayPostTimeMs);
+    ccAddExternalStaticFunction("Speech::set_DisplayPostTimeMs",      Sc_Speech_SetDisplayPostTimeMs);
+	ccAddExternalStaticFunction("Speech::get_GlobalSpeechAnimationDelay", Sc_Speech_GetGlobalSpeechAnimationDelay);
+	ccAddExternalStaticFunction("Speech::set_GlobalSpeechAnimationDelay", Sc_Speech_SetGlobalSpeechAnimationDelay);
     ccAddExternalStaticFunction("Speech::get_PortraitXOffset",        Sc_Speech_GetPortraitXOffset);
     ccAddExternalStaticFunction("Speech::set_PortraitXOffset",        Sc_Speech_SetPortraitXOffset);
     ccAddExternalStaticFunction("Speech::get_PortraitY",              Sc_Speech_GetPortraitY);
     ccAddExternalStaticFunction("Speech::set_PortraitY",              Sc_Speech_SetPortraitY);
     ccAddExternalStaticFunction("Speech::get_SkipKey",                Sc_Speech_GetSkipKey);
     ccAddExternalStaticFunction("Speech::set_SkipKey",                Sc_Speech_SetSkipKey);
-    ccAddExternalStaticFunction("Speech::get_SkipType",               Sc_Speech_GetSkipType);
-    ccAddExternalStaticFunction("Speech::set_SkipType",               Sc_SetSkipSpeech);
+    ccAddExternalStaticFunction("Speech::get_SkipStyle",              Sc_Speech_GetSkipStyle);
+    ccAddExternalStaticFunction("Speech::set_SkipStyle",              Sc_SetSkipSpeech);
     ccAddExternalStaticFunction("Speech::get_Style",                  Sc_Speech_GetStyle);
     ccAddExternalStaticFunction("Speech::set_Style",                  Sc_SetSpeechStyle);
     ccAddExternalStaticFunction("Speech::get_TextAlignment",          Sc_Speech_GetTextAlignment);
     ccAddExternalStaticFunction("Speech::set_TextAlignment",          Sc_Speech_SetTextAlignment);
+	ccAddExternalStaticFunction("Speech::get_UseGlobalSpeechAnimationDelay", Sc_Speech_GetUseGlobalSpeechAnimationDelay);
+	ccAddExternalStaticFunction("Speech::set_UseGlobalSpeechAnimationDelay", Sc_Speech_SetUseGlobalSpeechAnimationDelay);
     ccAddExternalStaticFunction("Speech::get_VoiceMode",              Sc_Speech_GetVoiceMode);
     ccAddExternalStaticFunction("Speech::set_VoiceMode",              Sc_SetVoiceMode);
 

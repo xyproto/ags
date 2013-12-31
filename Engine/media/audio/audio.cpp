@@ -41,7 +41,7 @@ extern CharacterInfo*playerchar;
 extern int psp_is_old_datafile;
 
 #if !defined(IOS_VERSION) && !defined(PSP_VERSION) && !defined(ANDROID_VERSION)
-volatile int psp_audio_multithreaded = 1;
+volatile int psp_audio_multithreaded = 0;
 #endif
 
 char acaudio_buffer[256];
@@ -107,7 +107,7 @@ void move_track_to_crossfade_channel(int currentChannel, int crossfadeSpeed, int
 
     play.CrossfadingOutChannel = SPECIAL_CROSSFADE_CHANNEL;
     play.CrossfadeStep = 0;
-    play.CrossfadeInitialVolumeOut = channels[SPECIAL_CROSSFADE_CHANNEL]->volAsPercentage;
+    play.crossfade_initial_volume_out = channels[SPECIAL_CROSSFADE_CHANNEL]->get_volume();
     play.CrossfadeOutVolumePerStep = crossfadeSpeed;
 
     play.CrossfadingInChannel = fadeInChannel;
@@ -251,9 +251,7 @@ SOUNDCLIP *load_sound_clip(ScriptAudioClip *audioClip, bool repeat)
     }
     if (soundClip != NULL)
     {
-        soundClip->volAsPercentage = audioClip->defaultVolume;
-        soundClip->originalVolAsPercentage = soundClip->volAsPercentage;
-        soundClip->set_volume((audioClip->defaultVolume * 255) / 100);
+        soundClip->set_volume_origin(audioClip->defaultVolume);
         soundClip->soundType = audioClip->type;
         soundClip->sourceClip = audioClip;
     }
@@ -277,7 +275,7 @@ void audio_update_polled_stuff()
         if (channels[play.CrossfadingOutChannel] == NULL)
             quitprintf("Crossfade out channel is %d but channel has gone", play.CrossfadingOutChannel);
 
-        int newVolume = channels[play.CrossfadingOutChannel]->volAsPercentage - play.CrossfadeOutVolumePerStep;
+        int newVolume = channels[play.crossfading_out_channel]->get_volume() - play.crossfade_out_volume_per_step;
         if (newVolume > 0)
         {
             AudioChannel_SetVolume(&scrAudioChannel[play.CrossfadingOutChannel], newVolume);
@@ -291,7 +289,7 @@ void audio_update_polled_stuff()
 
     if (play.CrossfadingInChannel > 0)
     {
-        int newVolume = channels[play.CrossfadingInChannel]->volAsPercentage + play.CrossfadeInVolumePerStep;
+        int newVolume = channels[play.crossfading_in_channel]->get_volume() + play.crossfade_in_volume_per_step;
         if (newVolume > play.CrossfadeFinalVolumeIn)
         {
             newVolume = play.CrossfadeFinalVolumeIn;
@@ -346,7 +344,7 @@ void queue_audio_clip_to_play(ScriptAudioClip *clip, int priority, int repeat)
     }
     
     if (!psp_audio_multithreaded)
-      update_polled_stuff(false);
+      update_polled_mp3();
 }
 
 ScriptAudioChannel* play_audio_clip_on_channel(int channel, ScriptAudioClip *clip, int priority, int repeat, int fromOffset, SOUNDCLIP *soundfx)
@@ -368,16 +366,21 @@ ScriptAudioChannel* play_audio_clip_on_channel(int channel, ScriptAudioClip *cli
 
     if (play.CrossfadingInChannel == channel)
     {
-        soundfx->set_volume(0);
-        soundfx->volAsPercentage = 0;
+        soundfx->set_volume_origin(0);
     }
 
-    if (play.FastForwardCutscene) 
+    // Mute the audio clip if fast-forwarding the cutscene
     {
-        soundfx->set_volume(0);
-        soundfx->volAsPercentage = 0;
+        soundfx->set_volume_override(0);
 
-        if (game.AudioClipTypes[clip->type].reservedChannels != 1)
+        // CHECKME!!
+        // [IKM] According to the 3.2.1 logic the clip will restore
+        // its value after cutscene, but only if originalVolAsPercentage
+        // is not zeroed. Something I am not sure about: why does it
+        // disable the clip under condition that there's more than one
+        // channel for this audio type? It does not even check if
+        // anything of this type is currently playing.
+        if (game.audioClipTypes[clip->type].reservedChannels != 1)
             soundfx->originalVolAsPercentage = 0;
     }
 
@@ -820,7 +823,7 @@ void play_next_queued() {
 
 int calculate_max_volume() {
     // quieter so that sounds can be heard better
-    int newvol=play.MusicMasterVolume + ((int)thisroom.Options[kRoomBaseOpt_MusicVolume]) * 30;
+    int newvol=play.music_master_volume + ((int)thisroom.options[ST_VOLUME]) * LegacyRoomVolumeFactor;
     if (newvol>255) newvol=255;
     if (newvol<0) newvol=0;
 
@@ -828,12 +831,6 @@ int calculate_max_volume() {
         newvol = 0;
 
     return newvol;
-}
-
-void update_polled_stuff_if_runtime()
-{
-    if (!psp_audio_multithreaded)
-      update_polled_stuff(true);
 }
 
 // add/remove the volume drop to the audio channels while speech is playing
@@ -846,12 +843,10 @@ void apply_volume_drop_modifier(bool applyModifier)
             if (applyModifier)
             {
                 int audioType = ((ScriptAudioClip*)channels[i]->sourceClip)->type;
-                channels[i]->volModifier = -(game.AudioClipTypes[audioType].volume_reduction_while_speech_playing * 255 / 100);
+                channels[i]->apply_volume_modifier(-(game.audioClipTypes[audioType].volume_reduction_while_speech_playing * 255 / 100));
             }
             else
-                channels[i]->volModifier = 0;
-
-            channels[i]->set_volume(channels[i]->vol);
+                channels[i]->apply_volume_modifier(0);
         }
     }
 }
@@ -859,14 +854,9 @@ void apply_volume_drop_modifier(bool applyModifier)
 extern volatile char want_exit;
 extern int frames_per_second;
 
-void update_polled_stuff(bool checkForDebugMessages) {
+void update_polled_mp3() {
     UPDATE_MP3
-/*
-        if (want_exit) {
-            want_exit = 0;
-            quit("||exit!");
-        }
-*/
+
         if (mvolcounter > update_music_at) {
             update_music_volume();
             apply_volume_drop_modifier(false);
@@ -874,14 +864,11 @@ void update_polled_stuff(bool checkForDebugMessages) {
             mvolcounter = 0;
             update_ambient_sound_vol();
         }
-
-        if ((editor_debugging_initialized) && (checkForDebugMessages))
-            check_for_messages_from_editor();
 }
 
 // Update the music, and advance the crossfade on a step
 // (this should only be called once per game loop)
-void update_polled_stuff_and_crossfade () {
+void update_polled_audio_and_crossfade () {
    
   update_polled_stuff_if_runtime ();
 

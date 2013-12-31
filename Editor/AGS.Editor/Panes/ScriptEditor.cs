@@ -86,6 +86,7 @@ namespace AGS.Editor
             scintilla.IsModifiedChanged -= new EventHandler(scintilla_IsModifiedChanged);
             scintilla.AttemptModify -= new ScintillaWrapper.AttemptModifyHandler(scintilla_AttemptModify);
             scintilla.UpdateUI -= new EventHandler(scintilla_UpdateUI);
+            scintilla.OnBeforeShowingAutoComplete -= new EventHandler(scintilla_OnBeforeShowingAutoComplete);
             scintilla.TextModified -= new ScintillaWrapper.TextModifiedHandler(scintilla_TextModified);
             scintilla.ConstructContextMenu -= new ScintillaWrapper.ConstructContextMenuHandler(scintilla_ConstructContextMenu);
             scintilla.ActivateContextMenu -= new ScintillaWrapper.ActivateContextMenuHandler(scintilla_ActivateContextMenu);
@@ -134,8 +135,6 @@ namespace AGS.Editor
             InitScintilla();            
         }
         
-        public bool MovedFromDocument { get; set; }
-
         public int FirstVisibleLine { get { return _firstVisibleLine; } }
 
         public string ModifiedText
@@ -165,6 +164,7 @@ namespace AGS.Editor
             scintilla.IsModifiedChanged += new EventHandler(scintilla_IsModifiedChanged);
             scintilla.AttemptModify += new ScintillaWrapper.AttemptModifyHandler(scintilla_AttemptModify);
             scintilla.UpdateUI += new EventHandler(scintilla_UpdateUI);
+            scintilla.OnBeforeShowingAutoComplete += new EventHandler(scintilla_OnBeforeShowingAutoComplete);
             scintilla.TextModified += new ScintillaWrapper.TextModifiedHandler(scintilla_TextModified);
             scintilla.ConstructContextMenu += new ScintillaWrapper.ConstructContextMenuHandler(scintilla_ConstructContextMenu);
             scintilla.ActivateContextMenu += new ScintillaWrapper.ActivateContextMenuHandler(scintilla_ActivateContextMenu);
@@ -177,7 +177,7 @@ namespace AGS.Editor
 
             scintilla.SetKeyWords(Constants.SCRIPT_KEY_WORDS);
             UpdateStructHighlighting();
-        }
+        }        
 
         public void ActivateWindow()
         {
@@ -453,7 +453,7 @@ namespace AGS.Editor
             _script.Text = scintilla.GetText();
             _editorTextModifiedSinceLastCopy = false;
         }
-
+        
         public void SaveChanges()
         {
             if (_editorTextModifiedSinceLastCopy)
@@ -782,6 +782,15 @@ namespace AGS.Editor
                 //really was 0, but then the user could simply press Ctrl+Home and fix this easily.
                 _firstVisibleLine = scintilla.FirstVisibleLine;
             }            
+        }
+
+        private void scintilla_OnBeforeShowingAutoComplete(object sender, EventArgs e)
+        {
+            if (_editorTextModifiedSinceLastCopy)
+            {
+                UpdateScriptObjectWithLatestTextInWindow();
+            }
+            AutoComplete.ConstructCache(_script);
         }
 
         private void scintilla_TextModified(int startPos, int length, bool wasAdded)

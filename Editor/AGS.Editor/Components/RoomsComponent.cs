@@ -12,7 +12,7 @@ using System.Threading;
 
 namespace AGS.Editor.Components
 {
-    class RoomsComponent : BaseComponentWithScripts<UnloadedRoom, UnloadedRoomFolder>, IRoomController
+    class RoomsComponent : BaseComponentWithScripts<IRoom, UnloadedRoomFolder>, IRoomController
     {
         private const string ROOMS_COMMAND_ID = "Rooms";
         private const string COMMAND_NEW_ITEM = "NewRoom";
@@ -192,12 +192,12 @@ namespace AGS.Editor.Components
             return okToContinue;
         }
 
-        protected override void DeleteResourcesUsedByItem(UnloadedRoom item)
+        protected override void DeleteResourcesUsedByItem(IRoom item)
         {
             DeleteRoom(item);
         }
 
-        private void DeleteRoom(UnloadedRoom roomToDelete)
+        private void DeleteRoom(IRoom roomToDelete)
         {
             UnloadRoom(roomToDelete);
 
@@ -303,7 +303,7 @@ namespace AGS.Editor.Components
 			}
 		}
 
-        private void UnloadRoom(UnloadedRoom roomToDelete)
+        private void UnloadRoom(IRoom roomToDelete)
         {
             if ((_loadedRoom != null) && (roomToDelete.Number == _loadedRoom.Number))
             {
@@ -642,7 +642,8 @@ namespace AGS.Editor.Components
 
         private DockData GetPreviousDockData()
         {
-            if (_roomSettings != null &&
+            if (_roomSettings != null && _roomSettings.Control != null && 
+                _roomSettings.Control.DockingContainer != null &&
                 _roomSettings.Control.DockingContainer.DockState != DockingState.Hidden &&
                 _roomSettings.Control.DockingContainer.DockState != DockingState.Unknown)
             {
@@ -1253,7 +1254,7 @@ namespace AGS.Editor.Components
 				Room room;
 				if ((_loadedRoom == null) || (_loadedRoom.Number != unloadedRoom.Number))
 				{
-					UnloadCurrentRoom();
+					UnloadCurrentRoomAndGreyOutTree();
 					room = LoadNewRoomIntoMemory(unloadedRoom, errors);
 				}
 				else
@@ -1387,7 +1388,7 @@ namespace AGS.Editor.Components
             }
         }
 
-        protected override ProjectTreeItem CreateTreeItemForItem(UnloadedRoom room)
+        protected override ProjectTreeItem CreateTreeItemForItem(IRoom room)
 		{
 			string iconName = ROOM_ICON_UNLOADED;
 

@@ -120,6 +120,23 @@ int Dialog_HasOptionBeenChosen(ScriptDialog *sd, int option)
   return 0;
 }
 
+void Dialog_SetHasOptionBeenChosen(ScriptDialog *sd, int option, bool chosen)
+{
+    if (option < 1 || option > dialog[sd->id].numoptions)
+    {
+        quit("!Dialog.HasOptionBeenChosen: Invalid option number specified");
+    }
+    option--;
+    if (chosen)
+    {
+        dialog[sd->id].optionflags[option] |= DFLG_HASBEENCHOSEN;
+    }
+    else
+    {
+        dialog[sd->id].optionflags[option] &= ~DFLG_HASBEENCHOSEN;
+    }
+}
+
 int Dialog_GetOptionCount(ScriptDialog *sd)
 {
   return dialog[sd->id].OptionCount;
@@ -315,7 +332,7 @@ int run_dialog_script(DialogTopicInfo*dtpp, int dialogID, int offse, int optionI
   return result;
 }
 
-int write_dialog_options(Bitmap *ds, int dlgxp, int curyp, int numdisp, int mouseison, int areawid,
+int write_dialog_options(Bitmap *ds, bool ds_has_alpha, int dlgxp, int curyp, int numdisp, int mouseison, int areawid,
     int bullet_wid, int usingfont, const DialogTopicInfo*dtop, const AGS::Common::Array<char> &disporder,
     AGS::Common::Array<short> &dispyp,
     int txthit, int utextcol) {
@@ -342,8 +359,10 @@ int write_dialog_options(Bitmap *ds, int dlgxp, int curyp, int numdisp, int mous
 
     break_up_text_into_lines(areawid-(8+bullet_wid),usingfont,get_translation(dtop->Options[disporder[ww]].Name));
     dispyp[ww]=curyp;
-    if (game.DialogBulletSprIndex > 0)
-      wputblock(ds, dlgxp,curyp,spriteset[game.DialogBulletSprIndex],1);
+    if (game.dialog_bullet > 0)
+    {
+        draw_gui_sprite_v330(ds, game.dialog_bullet, dlgxp, curyp, ds_has_alpha);
+    }
     int cc;
     if (game.Options[OPT_DIALOGNUMBERED]) {
       char tempbfr[20];
@@ -381,8 +400,8 @@ void draw_gui_for_dialog_options(Bitmap *ds, GuiMain *guib, int dlgxp, int dlgyp
     color_t draw_color = ds->GetCompatibleColor(guib->BackgroundColor);
     ds->FillRect(Rect(dlgxp, dlgyp, dlgxp + guib->GetWidth(), dlgyp + guib->GetHeight()), draw_color);
   }
-  if (guib->BackgroundImage > 0)
-      AGS::Engine::GfxUtil::DrawSpriteWithTransparency(ds, spriteset[guib->BackgroundImage], dlgxp, dlgyp);
+  if (guib->bgpic > 0)
+      GfxUtil::DrawSpriteWithTransparency(ds, spriteset[guib->bgpic], dlgxp, dlgyp);
 }
 
 bool get_custom_dialog_options_dimensions(int dlgnum)
@@ -413,6 +432,7 @@ struct DialogOptions
 
     int dlgxp;
     int dlgyp;
+    int dialog_abs_x; // absolute dialog position on screen
     int usingfont;
     int txthit;
     int curswas;
@@ -435,6 +455,7 @@ struct DialogOptions
     int curyp;
     int wantRefresh;
     bool usingCustomRendering;
+    bool options_surface_has_alpha;
     int orixp;
     int oriyp;
     int areawid;
@@ -549,6 +570,7 @@ void DialogOptions::Show()
     dirtywidth = virtual_screen->GetWidth();
     dirtyheight = virtual_screen->GetHeight();
     usingCustomRendering = false;
+    options_surface_has_alpha = false;
 
     dlgxp = 1;
     if (get_custom_dialog_options_dimensions(dlgnum))
@@ -558,6 +580,7 @@ void DialogOptions::Show()
       dirtyy = multiply_up_coordinate(ccDialogOptionsRendering.y);
       dirtywidth = multiply_up_coordinate(ccDialogOptionsRendering.width);
       dirtyheight = multiply_up_coordinate(ccDialogOptionsRendering.height);
+      dialog_abs_x = dirtyx;
     }
     else if (game.Options[OPT_DIALOGIFACE] > 0)
     {
@@ -570,12 +593,12 @@ void DialogOptions::Show()
       else {
         dlgxp = guib->GetX();
         dlgyp = guib->GetY();
-        draw_gui_for_dialog_options(ds, guib, dlgxp, dlgyp);
 
         dirtyx = dlgxp;
         dirtyy = dlgyp;
         dirtywidth = guib->GetWidth();
         dirtyheight = guib->GetHeight();
+        dialog_abs_x = guib->x;
 
         areawid=guib->GetWidth() - 5;
 
@@ -593,12 +616,12 @@ void DialogOptions::Show()
       areawid=scrnwid-5;
       GET_OPTIONS_HEIGHT
       dlgyp = scrnhit - needheight;
-      ds->FillRect(Rect(0,dlgyp-1,scrnwid-1,scrnhit-1), draw_color);
 
       dirtyx = 0;
       dirtyy = dlgyp - 1;
       dirtywidth = scrnwid;
       dirtyheight = scrnhit - dirtyy;
+      dialog_abs_x = 0;
     }
     if (!is_textwindow)
       areawid -= multiply_up_coordinate(play.DialogOptionsX) * 2;
@@ -645,7 +668,8 @@ void DialogOptions::Redraw()
       ccDialogOptionsRendering.surfaceToRenderTo = dialogOptionsRenderingSurface;
       ccDialogOptionsRendering.surfaceAccessed = false;
       dialogOptionsRenderingSurface->linkedBitmapOnly = tempScrn;
-      dialogOptionsRenderingSurface->hasAlphaChannel = false;
+      dialogOptionsRenderingSurface->hasAlphaChannel = ccDialogOptionsRendering.hasAlphaChannel;
+      options_surface_has_alpha = dialogOptionsRenderingSurface->hasAlphaChannel != 0;
 
       renderDialogOptionsFunc.params[0].SetDynamicObject(&ccDialogOptionsRendering, &ccDialogOptionsRendering);
       run_function_on_non_blocking_thread(&renderDialogOptionsFunc);
@@ -693,6 +717,7 @@ void DialogOptions::Redraw()
       push_screen(ds);
       Bitmap *text_window_ds = ds;
       draw_text_window(&text_window_ds, false, &txoffs,&tyoffs,&xspos,&yspos,&areawid,NULL,needheight, game.Options[OPT_DIALOGIFACE]);
+      options_surface_has_alpha = guis[game.options[OPT_DIALOGIFACE]].is_alpha();
       ds = pop_screen();
       // snice draw_text_window incrases the width, restore it
       areawid = savedwid;
@@ -702,15 +727,16 @@ void DialogOptions::Redraw()
       dirtyy = yspos;
       dirtywidth = text_window_ds->GetWidth();
       dirtyheight = text_window_ds->GetHeight();
+      dialog_abs_x = txoffs + xspos;
 
-      wputblock(ds, xspos,yspos,text_window_ds,1);
+      GfxUtil::DrawSpriteWithTransparency(ds, text_window_ds, xspos, yspos);
       delete text_window_ds;
 
       // Ignore the dialog_options_x/y offsets when using a text window
       txoffs += xspos;
       tyoffs += yspos;
       dlgyp = tyoffs;
-      curyp = write_dialog_options(ds, txoffs,tyoffs,numdisp,mouseison,areawid,bullet_wid,usingfont,dtop,disporder,dispyp,txthit,forecol);
+      curyp = write_dialog_options(ds, options_surface_has_alpha, txoffs,tyoffs,numdisp,mouseison,areawid,bullet_wid,usingfont,dtop,disporder,dispyp,txthit,forecol);
       if (parserInput)
         parserInput->SetX(txoffs);
     }
@@ -740,11 +766,13 @@ void DialogOptions::Redraw()
         GuiMain* guib = &guis[game.Options[OPT_DIALOGIFACE]];
         dirtyheight = guib->GetHeight();
         dirtyy = dlgyp;
+        options_surface_has_alpha = guib->is_alpha();
       }
       else
       {
         dirtyy = dlgyp - 1;
         dirtyheight = needheight + 1;
+        options_surface_has_alpha = false;
       }
 
       dlgxp += multiply_up_coordinate(play.DialogOptionsX);
@@ -757,7 +785,7 @@ void DialogOptions::Redraw()
 
       //curyp = dlgyp + 1;
       curyp = dlgyp;
-      curyp = write_dialog_options(ds, dlgxp,curyp,numdisp,mouseison,areawid,bullet_wid,usingfont,dtop,disporder,dispyp,txthit,forecol);
+      curyp = write_dialog_options(ds, options_surface_has_alpha, dlgxp,curyp,numdisp,mouseison,areawid,bullet_wid,usingfont,dtop,disporder,dispyp,txthit,forecol);
 
       /*if (curyp > scrnhit) {
         dlgyp = scrnhit - (curyp - dlgyp);
@@ -776,8 +804,10 @@ void DialogOptions::Redraw()
       if (mouseison == DLG_OPTION_PARSER)
         parserInput->TextColor = forecol;
 
-      if (game.DialogBulletSprIndex)  // the parser X will get moved in a second
-        wputblock(ds, parserInput->GetX(), parserInput->GetY(), spriteset[game.DialogBulletSprIndex], 1);
+      if (game.dialog_bullet)  // the parser X will get moved in a second
+      {
+          draw_gui_sprite_v330(ds, game.dialog_bullet, parserInput->x, parserInput->y, options_surface_has_alpha);
+      }
 
       parserInput->SetWidth(parserInput->GetWidth() - bullet_wid);
       parserInput->SetX(parserInput->GetX() + bullet_wid);
@@ -813,12 +843,16 @@ void DialogOptions::Redraw()
       gfxDriver->DestroyDDB(ddb);
       ddb = NULL;
     }
-    if (ddb == NULL)
-      ddb = gfxDriver->CreateDDBFromBitmap(subBitmap, false, false);
-    else
-      gfxDriver->UpdateDDBFromBitmap(ddb, subBitmap, false);
 
-    render_graphics(ddb, dirtyx, dirtyy);
+    if (ddb == NULL)
+      ddb = gfxDriver->CreateDDBFromBitmap(subBitmap, options_surface_has_alpha, false);
+    else
+      gfxDriver->UpdateDDBFromBitmap(ddb, subBitmap, options_surface_has_alpha);
+
+    if (runGameLoopsInBackground)
+    {
+        render_graphics(ddb, dirtyx, dirtyy);
+    }
 }
 
 bool DialogOptions::Run()
@@ -836,7 +870,7 @@ bool DialogOptions::Run()
 
         render_graphics(ddb, dirtyx, dirtyy);
       
-        update_polled_stuff_and_crossfade();
+        update_polled_audio_and_crossfade();
       }
 
       if (kbhit()) {
@@ -892,8 +926,9 @@ bool DialogOptions::Run()
           ccDialogOptionsRendering.activeOptionID = -1;
         }
       }
-      else if ((mousey <= dlgyp) || (mousey > curyp)) ;
-      else {
+      else if (mousex >= dialog_abs_x && mousex < (dialog_abs_x + areawid) &&
+               mousey >= dlgyp && mousey < curyp)
+      {
         mouseison=numdisp-1;
         for (int i = 0; i < numdisp; ++i) {
           if (mousey < dispyp[i]) { mouseison=i-1; break; }
@@ -1216,6 +1251,11 @@ RuntimeScriptValue Sc_Dialog_HasOptionBeenChosen(void *self, const RuntimeScript
     API_OBJCALL_INT_PINT(ScriptDialog, Dialog_HasOptionBeenChosen);
 }
 
+RuntimeScriptValue Sc_Dialog_SetHasOptionBeenChosen(void *self, const RuntimeScriptValue *params, int32_t param_count)
+{
+    API_OBJCALL_VOID_PINT_PBOOL(ScriptDialog, Dialog_SetHasOptionBeenChosen);
+}
+
 // void (ScriptDialog *sd, int option, int newState)
 RuntimeScriptValue Sc_Dialog_SetOptionState(void *self, const RuntimeScriptValue *params, int32_t param_count)
 {
@@ -1237,6 +1277,7 @@ void RegisterDialogAPI()
     ccAddExternalObjectFunction("Dialog::GetOptionState^1",     Sc_Dialog_GetOptionState);
     ccAddExternalObjectFunction("Dialog::GetOptionText^1",      Sc_Dialog_GetOptionText);
     ccAddExternalObjectFunction("Dialog::HasOptionBeenChosen^1", Sc_Dialog_HasOptionBeenChosen);
+    ccAddExternalObjectFunction("Dialog::SetHasOptionBeenChosen^2", Sc_Dialog_SetHasOptionBeenChosen);
     ccAddExternalObjectFunction("Dialog::SetOptionState^2",     Sc_Dialog_SetOptionState);
     ccAddExternalObjectFunction("Dialog::Start^0",              Sc_Dialog_Start);
 

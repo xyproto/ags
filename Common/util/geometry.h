@@ -114,6 +114,16 @@ struct Size
         Width = width;
         Height = height;
     }
+
+    inline bool operator==(const Size size) const
+    {
+        return Width == size.Width && Height == size.Height;
+    }
+
+    inline bool operator!=(const Size size) const
+    {
+        return Width != size.Width || Height != size.Height;
+    }
 };
 
 struct Rect

@@ -174,7 +174,7 @@ bool Bitmap::LoadFromFile(const char *filename)
 		_alBitmap = al_bmp;
         _refCount = new int(1);
 	}
-	return NULL;
+	return _alBitmap != NULL;
 }
 
 bool Bitmap::SaveToFile(const char *filename, const void *palette)
@@ -210,7 +210,7 @@ color_t Bitmap::GetCompatibleColor(color_t color)
 
 void Bitmap::SetClip(const Rect &rc)
 {
-	set_clip(_alBitmap, rc.Left, rc.Top, rc.Right, rc.Bottom);
+	set_clip_rect(_alBitmap, rc.Left, rc.Top, rc.Right, rc.Bottom);
 }
 
 Rect Bitmap::GetClip() const

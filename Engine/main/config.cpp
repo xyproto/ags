@@ -18,8 +18,10 @@
 
 #include "ac/spritecache.h"
 #include "game/game_objects.h"
+#include "debug/debug_log.h"
 #include "main/mainheader.h"
 #include "main/config.h"
+#include "platform/base/agsplatformdriver.h"
 #include "platform/base/override_defines.h" //_getcwd()
 #include "util/filestream.h"
 #include "util/textstreamreader.h"
@@ -131,6 +133,17 @@ int INIreadint (const char *sectn, const char *item, int errornosect = 1) {
     return toret;
 }
 
+String INIreadstring(const char *sectn, const char *entry)
+{
+    char *tempstr = INIreaditem(sectn, entry);
+    String str = tempstr;
+    if (tempstr)
+    {
+        free(tempstr);
+    }
+    return str;
+}
+
 void read_config_file(char *argv0) {
 
     // Try current directory for config first; else try exe dir
@@ -207,6 +220,9 @@ void read_config_file(char *argv0) {
         if (usetup.MidiSoundCard < 0)
             usetup.MidiSoundCard = MIDI_AUTODETECT;
 #endif
+        int threaded_audio = INIreadint("sound", "threaded");
+        if (threaded_audio >= 0)
+            psp_audio_multithreaded = threaded_audio;
 
         usetup.Windowed = INIreadint("misc","windowed");
         if (usetup.Windowed < 0)
@@ -231,7 +247,7 @@ void read_config_file(char *argv0) {
         int no_speech = INIreadint ("sound", "usespeech", 0) != 0;
         usetup.NoSpeechPack = no_speech == 0;
 
-        usetup.DataFilesDir = INIreaditem("misc","datadir");
+        usetup.data_files_dir = INIreadstring("misc","datadir");
         if (usetup.DataFilesDir.IsEmpty())
             usetup.DataFilesDir = ".";
         // strip any trailing slash
@@ -246,19 +262,19 @@ void read_config_file(char *argv0) {
 #else
         usetup.DataFilesDir.TrimRight('/');
 #endif
-        usetup.MainDataFilename = INIreaditem ("misc", "datafile");
+        usetup.main_data_filename = INIreadstring ("misc", "datafile");
 
 #if defined(IOS_VERSION) || defined(PSP_VERSION) || defined(ANDROID_VERSION)
         // PSP: No graphic filters are available.
         usetup.GfxFilterID.Empty();
 #else
-        char *gfx_filter = INIreaditem("misc", "gfxfilter");
+        usetup.gfxFilterID = INIreadstring("misc", "gfxfilter");
         usetup.GfxFilterID = gfx_filter;
         free(gfx_filter);
 #endif
 
 #if defined (WINDOWS_VERSION)
-        char *gfx_driver = INIreaditem("misc", "gfxdriver");
+        usetup.gfxDriverID = INIreadstring("misc", "gfxdriver");
         usetup.GfxDriverID = gfx_driver;
         free(gfx_driver);
 #else
@@ -285,6 +301,36 @@ void read_config_file(char *argv0) {
         else
             play.IsPlayback = 0;
 
+        usetup.override_multitasking = INIreadint("override", "multitasking");
+        String override_os = INIreadstring("override", "os");
+        usetup.override_script_os = -1;
+        if (override_os.CompareNoCase("dos") == 0)
+        {
+            usetup.override_script_os = eOS_DOS;
+        }
+        else if (override_os.CompareNoCase("win") == 0)
+        {
+            usetup.override_script_os = eOS_Win;
+        }
+        else if (override_os.CompareNoCase("linux") == 0)
+        {
+            usetup.override_script_os = eOS_Linux;
+        }
+        else if (override_os.CompareNoCase("mac") == 0)
+        {
+            usetup.override_script_os = eOS_Mac;
+        }
+
+        // NOTE: at the moment AGS provide little means to determine whether an
+        // option was overriden by command line, and since command line args
+        // are applied first, we need to check if the option differs from
+        // default before applying value from config file.
+        if (!enable_log_file && !disable_log_file)
+        {
+            int log_value = INIreadint ("misc", "log");
+            if (log_value >= 0)
+                enable_log_file = log_value > 0;
+        }
     }
 
     if (usetup.GfxDriverID.IsEmpty())

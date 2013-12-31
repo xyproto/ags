@@ -72,7 +72,7 @@ void GuiInvWindow::Draw(Bitmap *ds)
     for (int item = TopItem; item < last_item; ++item)
     {
         // draw inv graphic
-        draw_sprite_compensate(ds, game.InventoryItems[charextra[GetCharacterId()].invorder[item]].pic, draw_at.X, draw_at.Y, 1);
+        draw_gui_sprite(ds, game.invinfo[charextra[this->CharToDisplay()].invorder[uu]].pic, cxp, cyp, true);
         draw_at.X += multiply_up_coordinate(ItemWidth);
 
         // go to next row when appropriate

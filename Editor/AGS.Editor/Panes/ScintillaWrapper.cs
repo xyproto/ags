@@ -10,6 +10,7 @@ using System.Data;
 using System.Text;
 using System.Windows.Forms;
 using AGS.Types.Interfaces;
+using System.Runtime.InteropServices;
 
 namespace AGS.Editor
 {
@@ -58,6 +59,7 @@ namespace AGS.Editor
 
         public event EventHandler IsModifiedChanged;
         public event EventHandler UpdateUI;
+        public event EventHandler OnBeforeShowingAutoComplete;
         public event EventHandler<Scintilla.MarginClickEventArgs> ToggleBreakpoint;
         public delegate void CharAddedHandler(char charAdded);
         public event CharAddedHandler CharAdded;
@@ -555,7 +557,14 @@ namespace AGS.Editor
         public bool CanPaste()
         {
             //return this.scintillaControl1.CanPaste;
-            return Clipboard.ContainsText();
+            try
+            {
+                return Clipboard.ContainsText();
+            }
+            catch (ExternalException)
+            {
+                return false;
+            }
         }
 
         public void Paste()
@@ -1227,6 +1236,10 @@ namespace AGS.Editor
 
         private void ShowAutoComplete(int charsTyped, string autoCompleteList)
         {
+            if (OnBeforeShowingAutoComplete != null)
+            {
+                OnBeforeShowingAutoComplete(this, null);
+            }
             if (autoCompleteList.Length > 0)
             {
                 scintillaControl1.StyleSetFont((int)Cpp.GlobalDefault, USER_FRIENDLY_FONT);

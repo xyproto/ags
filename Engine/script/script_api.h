@@ -40,21 +40,21 @@ extern char ScSfBuffer[3000];
 #define ASSERT_SELF(METHOD) \
     if (!self) \
     { \
-        AGS::Common::Out::FPrint("Object pointer is null in call to " #METHOD); \
+        AGS::Common::Out::FPrint("ERROR: Object pointer is null in call to %s", ""#METHOD); \
         return RuntimeScriptValue(); \
     }
 
 #define ASSERT_PARAM_COUNT(FUNCTION, X) \
     if (X > 0 && (!params || param_count < X)) \
     { \
-        AGS::Common::Out::FPrint("Not enough parameters in call to "#FUNCTION": expected %d, got %d", X, param_count); \
+        AGS::Common::Out::FPrint("ERROR: Not enough parameters in call to %s: expected %d, got %d", ""#FUNCTION, X, param_count); \
         return RuntimeScriptValue(); \
     }
 
 #define ASSERT_VARIABLE_VALUE(VARIABLE) \
     if (!params || param_count < 1) \
     { \
-        AGS::Common::Out::FPrint("Not enough parameters to set "#VARIABLE": expected %d, got %d", 1, param_count); \
+        AGS::Common::Out::FPrint("ERROR: Not enough parameters to set %s: expected %d, got %d", ""#VARIABLE, 1, param_count); \
         return RuntimeScriptValue(); \
     }
 
@@ -213,6 +213,9 @@ extern char ScSfBuffer[3000];
     ASSERT_PARAM_COUNT(FUNCTION, 2) \
     return RuntimeScriptValue().SetInt32(FUNCTION(params[0].IValue, (P1CLASS*)params[1].Ptr))
 
+#define API_SCALL_BOOL(FUNCTION) \
+    return RuntimeScriptValue().SetInt32AsBool(FUNCTION())
+
 #define API_SCALL_OBJ(RET_CLASS, RET_MGR, FUNCTION) \
     return RuntimeScriptValue().SetDynamicObject((void*)(RET_CLASS*)FUNCTION(), &RET_MGR)
 
@@ -318,6 +321,11 @@ extern char ScSfBuffer[3000];
 #define API_OBJCALL_VOID_PINT6(CLASS, METHOD) \
     ASSERT_OBJ_PARAM_COUNT(METHOD, 6); \
     METHOD((CLASS*)self, params[0].IValue, params[1].IValue, params[2].IValue, params[3].IValue, params[4].IValue, params[5].IValue); \
+    return RuntimeScriptValue()
+
+#define API_OBJCALL_VOID_PINT_PBOOL(CLASS, METHOD) \
+    ASSERT_OBJ_PARAM_COUNT(METHOD, 2); \
+    METHOD((CLASS*)self, params[0].IValue, params[1].GetAsBool()); \
     return RuntimeScriptValue()
 
 #define API_OBJCALL_VOID_PINT_POBJ(CLASS, METHOD, P1CLASS) \

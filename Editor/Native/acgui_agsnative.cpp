@@ -5,12 +5,29 @@
 #pragma unmanaged
 
 #include "font/fonts.h"
+#include "gui/guimain.h"
 #include "gui/guibutton.h"
 #include "gui/guiinv.h"
 #include "gui/guilabel.h"
 #include "gui/guilistbox.h"
 #include "gui/guitextbox.h"
 #include "util/string_utils.h"
+
+bool GUIMain::is_alpha() 
+{
+    if (this->bgpic > 0)
+    {
+        // alpha state depends on background image
+        return is_sprite_alpha(this->bgpic);
+    }
+    if (this->bgcol > 0)
+    {
+        // not alpha transparent if there is a background color
+        return false;
+    }
+    // transparent background, enable alpha blending
+    return final_col_dep >= 24;
+}
 
 using AGS::Common::GuiButton;
 using AGS::Common::GuiInvWindow;

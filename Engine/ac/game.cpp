@@ -205,7 +205,7 @@ int Game_IsAudioPlaying(int audioType)
     for (int aa = 0; aa < MAX_SOUND_CHANNELS; aa++)
     {
         ScriptAudioClip *clip = AudioChannel_GetPlayingClip(&scrAudioChannel[aa]);
-        if (clip != NULL) 
+        if (clip != NULL)
         {
             if ((clip->type == audioType) || (audioType == SCR_NO_VALUE))
             {
@@ -240,8 +240,7 @@ void Game_SetAudioTypeVolume(int audioType, int volume, int changeType)
             ScriptAudioClip *clip = AudioChannel_GetPlayingClip(&scrAudioChannel[aa]);
             if ((clip != NULL) && (clip->type == audioType))
             {
-                channels[aa]->set_volume((volume * 255) / 100);
-                channels[aa]->volAsPercentage = volume;
+                channels[aa]->set_volume_origin(volume);
             }
         }
     }
@@ -255,7 +254,7 @@ void Game_SetAudioTypeVolume(int audioType, int volume, int changeType)
 }
 
 int Game_GetMODPattern() {
-    if (current_music_type == MUS_MOD) {
+    if (current_music_type == MUS_MOD && channels[SCHAN_MUSIC]) {
         return channels[SCHAN_MUSIC]->get_pos();
     }
     return -1;
@@ -307,14 +306,13 @@ String get_save_game_path(int slotNum) {
     return path;
 }
 
-
-
-int Game_SetSaveGameDirectory(const char *newFolder) {
+int SetSaveGameDirectoryPath(const char *newFolder, bool allowAbsolute)
+{
 
     // don't allow them to go to another folder
-    if ((newFolder[0] == '/') || (newFolder[0] == '\\') ||
+    if ((!allowAbsolute) && ((newFolder[0] == '/') || (newFolder[0] == '\\') ||
         (newFolder[0] == ' ') ||
-        ((newFolder[0] != 0) && (newFolder[1] == ':')))
+        ((newFolder[0] != 0) && (newFolder[1] == ':'))))
         return 0;
 
     char newSaveGameDir[260];
@@ -333,7 +331,8 @@ int Game_SetSaveGameDirectory(const char *newFolder) {
     strcpy(newFolderTempFile, newSaveGameDir);
     strcat(newFolderTempFile, "agstmp.tmp");
 
-    if (!Common::File::TestCreateFile(newFolderTempFile)) {
+    if (!Common::File::TestCreateFile(newFolderTempFile))
+	{
         return 0;
     }
 
@@ -341,7 +340,8 @@ int Game_SetSaveGameDirectory(const char *newFolder) {
     char restartGamePath[260];
     sprintf(restartGamePath, "%s""agssave.%d%s", saveGameDirectory, RESTART_POINT_SAVE_GAME_NUMBER, saveGameSuffix);
     Stream *restartGameFile = Common::File::OpenFileRead(restartGamePath);
-    if (restartGameFile != NULL) {
+    if (restartGameFile != NULL)
+	{
         long fileSize = restartGameFile->GetLength();
         char *mbuffer = (char*)malloc(fileSize);
         restartGameFile->Read(mbuffer, fileSize);
@@ -356,6 +356,11 @@ int Game_SetSaveGameDirectory(const char *newFolder) {
 
     strcpy(saveGameDirectory, newSaveGameDir);
     return 1;
+}
+
+int Game_SetSaveGameDirectory(const char *newFolder)
+{
+	return SetSaveGameDirectoryPath(newFolder, false);
 }
 
 
@@ -415,7 +420,7 @@ void setup_sierra_interface() {
 }
 
 
-void free_do_once_tokens() 
+void free_do_once_tokens()
 {
     play.DoOnceTokens.Free();
     play.DoOnceTokenCount = 0;
@@ -811,10 +816,10 @@ int Game_ChangeTranslation(const char *newFilename)
         return 1;
     }
 
-    char oldTransFileName[MAX_PATH];
-    strcpy(oldTransFileName, transFileName);
+    String oldTransFileName;
+    oldTransFileName = transFileName;
 
-    if (!init_translation(newFilename))
+    if (!init_translation(newFilename, oldTransFileName.LeftSection('.'), false))
     {
         strcpy(transFileName, oldTransFileName);
         return 0;
@@ -864,7 +869,7 @@ void safeguard_string (String &descript) {
 }
 
 // On Windows we could just use IIDFromString but this is platform-independant
-void convert_guid_from_text_to_binary(const char *guidText, unsigned char *buffer) 
+void convert_guid_from_text_to_binary(const char *guidText, unsigned char *buffer)
 {
     guidText++; // skip {
     for (int bytesDone = 0; bytesDone < 16; bytesDone++)
@@ -920,7 +925,7 @@ Bitmap *read_serialized_bitmap(Stream *in) {
     return thispic;
 }
 
-long write_screen_shot_for_vista(Stream *out, Bitmap *screenshot) 
+long write_screen_shot_for_vista(Stream *out, Bitmap *screenshot)
 {
     long fileSize = 0;
     char tempFileName[MAX_PATH];
@@ -932,7 +937,7 @@ long write_screen_shot_for_vista(Stream *out, Bitmap *screenshot)
 
     if (exists(tempFileName))
     {
-        fileSize = file_size(tempFileName);
+        fileSize = file_size_ex(tempFileName);
         char *buffer = (char*)malloc(fileSize);
 
         Stream *temp_in = Common::File::OpenFileRead(tempFileName);
@@ -1226,7 +1231,7 @@ void restore_game_clean_scripts()
     }
 }
 
-void restore_game_scripts(Stream *in, int &gdatasize, char **newglobaldatabuffer, 
+void restore_game_scripts(Stream *in, int &gdatasize, char **newglobaldatabuffer,
                           char **scriptModuleDataBuffers, int *scriptModuleDataSize)
 {
     // read the global script data segment
@@ -1535,7 +1540,7 @@ void restore_game_displayed_room_status(Stream *in, Bitmap **newbscene)
 
 void restore_game_globalvars(Stream *in)
 {
-    if (in->ReadInt32() != numGlobalVars) 
+    if (in->ReadInt32() != numGlobalVars)
         quit("!Game has been modified since save; unable to restore game (GM01)");
 
     for (int i = 0; i < numGlobalVars; ++i)
@@ -1591,9 +1596,8 @@ void restore_game_audioclips_and_crossfade(Stream *in, int crossfadeInChannelWas
             if (channels[bb] != NULL)
             {
                 channels[bb]->set_panning(pan);
-                channels[bb]->set_volume(vol);
+                channels[bb]->set_volume_alternate(volAsPercent, vol);
                 channels[bb]->panningAsPercentage = panAsPercent;
-                channels[bb]->volAsPercentage = volAsPercent;
             }
         }
     }
@@ -1662,7 +1666,7 @@ AGS::Engine::SavedGameError restore_game_data (Stream *in) {
         return res;
     }
 
-    restore_game_spriteset(in); 
+    restore_game_spriteset(in);
 
     clear_music_cache();
     restore_game_clean_gfx();
@@ -1708,7 +1712,7 @@ AGS::Engine::SavedGameError restore_game_data (Stream *in) {
     ReadCharacterExtras_Aligned(in);
     if (roominst!=NULL) {  // so it doesn't overwrite the ScriptData
         delete roominstFork;
-        delete roominst; 
+        delete roominst;
         roominstFork = NULL;
         roominst=NULL;
     }
@@ -1767,6 +1771,15 @@ AGS::Engine::SavedGameError restore_game_data (Stream *in) {
 
     // preserve legacy music type setting
     current_music_type = in->ReadInt32();
+    // test if the playing music was properly loaded
+    if (current_music_type > 0)
+    {
+        if (crossFading > 0 && !channels[crossFading] ||
+            crossFading <= 0 && !channels[SCHAN_MUSIC])
+        {
+            current_music_type = 0;
+        }
+    }
 
     // restore these to the ones retrieved from the save game
     for (bb = 0; bb < MAX_DYNAMIC_SURFACES; bb++)
@@ -1887,7 +1900,7 @@ AGS::Engine::SavedGameError restore_game_data (Stream *in) {
 
     if (musicpos > 0) {
     // For some reason, in Prodigal after this Seek line is called
-    // it can cause the next update_polled_stuff to crash;
+    // it can cause the next update_polled_mp3 to crash;
     // must be some sort of bug in AllegroMP3
     if ((crossFading > 0) && (channels[crossFading] != NULL))
     channels[crossFading]->seek(musicpos);
@@ -2067,12 +2080,11 @@ void stop_fast_forwarding() {
     // Restore actual volume of sounds
     for (int aa = 0; aa < MAX_SOUND_CHANNELS; aa++)
     {
-        if ((channels[aa] != NULL) && (!channels[aa]->done) && 
+        if ((channels[aa] != NULL) && (!channels[aa]->done) &&
             (channels[aa]->volAsPercentage == 0) &&
-            (channels[aa]->originalVolAsPercentage > 0)) 
+            (channels[aa]->originalVolAsPercentage > 0))
         {
-            channels[aa]->volAsPercentage = channels[aa]->originalVolAsPercentage;
-            channels[aa]->set_volume((channels[aa]->volAsPercentage * 255) / 100);
+            channels[aa]->reset_volume_to_origin();
         }
     }
 

@@ -250,19 +250,14 @@ void NewInteraction::ReadFromFile(Stream *in, bool ignore_pointers)
   in->ReadArray(&eventTypes, sizeof(*eventTypes), MAX_NEWINTERACTION_EVENTS);
   in->ReadArray(&timesRun, sizeof(*timesRun), MAX_NEWINTERACTION_EVENTS);
 
-  if (ignore_pointers)
+  // This function is called only when reading RoomStatus from savedgame,
+  // and the following response pointer values are never really used anywhere
+  // (and apparently are always NULL). The real full item deserialization is
+  // made by calling deserialize_new_interaction().
+  memset(response, 0, sizeof(response));
+  for (int i = 0; i < MAX_NEWINTERACTION_EVENTS; i++)
   {
-    for (int i = 0; i < MAX_NEWINTERACTION_EVENTS; i++)
-    {
-      in->ReadInt32();
-    }
-  }
-  else
-  {
-    for (int i = 0; i < MAX_NEWINTERACTION_EVENTS; i++)
-    {
-      response[i] = in->ReadInt32() != 0 ? (NewInteractionCommandList*)0x1 : NULL;
-    }
+    in->ReadInt32(); // response[i] 32-bit pointer;
   }
 }
 
@@ -350,14 +345,14 @@ NewInteraction *deserialize_new_interaction (Stream *in) {
     return NULL;
   }
   in->ReadArrayOfInt32 (&nitemp->eventTypes[0], nitemp->numEvents);
-  //in->ReadArray (&nitemp->response[0], sizeof(void*), nitemp->numEvents);
 
-  // 64 bit: The pointer is only checked against NULL to determine whether the event exists
+  bool load_response[MAX_NEWINTERACTION_EVENTS];
   for (a = 0; a < nitemp->numEvents; a++)
-    nitemp->response[a] = in->ReadInt32() != 0 ? (NewInteractionCommandList*)0x1 : NULL;
+    load_response[a] = in->ReadInt32() != 0;
 
+  memset(nitemp->response, 0, sizeof(nitemp->response));
   for (a = 0; a < nitemp->numEvents; a++) {
-    if (nitemp->response[a] != NULL)
+    if (load_response[a])
       nitemp->response[a] = deserialize_command_list (in);
     nitemp->timesRun[a] = 0;
   }

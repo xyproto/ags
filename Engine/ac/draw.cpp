@@ -809,17 +809,34 @@ void putpixel_compensate (Bitmap *ds, int xx,int yy, int col) {
 
 
 
-void draw_sprite_support_alpha(Bitmap *ds, int xpos, int ypos, Bitmap *image, int slot, int transparency) {
-
-    if ((game.SpriteFlags[slot] & SPF_ALPHACHANNEL) && (transparency == 0)) 
+void draw_sprite_support_alpha(Bitmap *ds, bool ds_has_alpha, int xpos, int ypos, Bitmap *image, bool src_has_alpha, int alpha)
+{
+    if (alpha <= 0)
     {
-        set_alpha_blender();
+        return;
+    }
+
+    const bool use_new_sprite_alpha_blending =
+        (game.options[OPT_SPRITEALPHA] == kSpriteAlphaRender_Improved) && ds_has_alpha;
+
+    if (src_has_alpha &&
+        (use_new_sprite_alpha_blending || alpha == 0xFF))
+    {
+        if (use_new_sprite_alpha_blending)
+           set_argb2argb_alpha_blender(alpha);
+        else
+            set_alpha_blender();
         ds->TransBlendBlt(image, xpos, ypos);
     }
-    else {
-        AGS::Engine::GfxUtil::DrawSpriteWithTransparency(ds, image, xpos, ypos, transparency);
+    else
+    {
+        GfxUtil::DrawSpriteWithTransparency(ds, image, xpos, ypos, alpha);
     }
+}
 
+void draw_sprite_slot_support_alpha(Bitmap *ds, bool ds_has_alpha, int xpos, int ypos, int src_slot, int alpha)
+{
+    draw_sprite_support_alpha(ds, ds_has_alpha, xpos, ypos, spriteset[src_slot], (game.spriteflags[src_slot] & SPF_ALPHACHANNEL) != 0, alpha);
 }
 
 
@@ -1082,23 +1099,39 @@ void repair_alpha_channel(Bitmap *dest, Bitmap *bgpic)
 
 
 // used by GUI renderer to draw images
-void draw_sprite_compensate(Bitmap *ds, int picc,int xx,int yy,int useAlpha) 
+void draw_gui_sprite(Bitmap *ds, int picc, int xx, int yy, bool use_alpha) 
 {
-    if ((useAlpha) && 
-        (game.Options[OPT_NEWGUIALPHA] > 0) &&
+    if ((use_alpha) && 
+        (game.options[OPT_NEWGUIALPHA] != kGuiAlphaRender_Classic) &&
         (ds->GetColorDepth() == 32))
     {
         if (game.SpriteFlags[picc] & SPF_ALPHACHANNEL)
-            set_additive_alpha_blender();
+        {
+            if (game.options[OPT_NEWGUIALPHA] == kGuiAlphaRender_MultiplyTranslucenceSrcBlend)
+            {
+                set_argb2argb_alpha_blender();
+            }
+            else
+            {
+                set_additive_alpha_blender();
+            }
+        }
         else
+        {
             set_opaque_alpha_blender();
+        }
 
         ds->TransBlendBlt(spriteset[picc], xx, yy);
     }
     else
     {
-        AGS::Engine::GfxUtil::DrawSpriteWithTransparency(ds, spriteset[picc], xx, yy);
+        GfxUtil::DrawSpriteWithTransparency(ds, spriteset[picc], xx, yy);
     }
+}
+
+void draw_gui_sprite_v330(Bitmap *ds, int pic, int x, int y, bool use_alpha)
+{
+    draw_gui_sprite(ds, pic, x, y, use_alpha && (loaded_game_file_version >= kGameVersion_330));
 }
 
 // function to sort the sprites into baseline order
@@ -2177,7 +2210,7 @@ void draw_screen_overlay() {
                 {
                     isAlpha = true;
 
-                    if ((game.Options[OPT_NEWGUIALPHA] == 0) && (guis[aa].BackgroundImage > 0))
+                    if ((game.options[OPT_NEWGUIALPHA] == kGuiAlphaRender_Classic) && (guis[aa].bgpic > 0))
                     {
                         // old-style (pre-3.0.2) GUI alpha rendering
                         repair_alpha_channel(guibg[aa], spriteset[guis[aa].BackgroundImage]);
@@ -2229,13 +2262,17 @@ void draw_screen_overlay() {
     }
 
     our_eip = 1099;
+}
 
+void put_sprite_list_on_screen()
+{
     // *** Draw the Things To Draw List ***
 
     SpriteListEntry *thisThing;
 
-    for (gg = 0; gg < thingsToDrawSize; gg++) {
-        thisThing = &thingsToDrawList[gg];
+    for (int i = 0; i < thingsToDrawSize; ++i)
+    {
+        thisThing = &thingsToDrawList[i];
 
         if (thisThing->bmp != NULL) {
             // mark the image's region as dirty
@@ -2268,8 +2305,10 @@ void draw_screen_overlay() {
     clear_draw_list();
 
     our_eip = 1100;
+}
 
-
+void draw_misc_info()
+{
     if (display_fps) 
     {
         draw_fps();
@@ -2501,6 +2540,8 @@ void construct_virtual_screen(bool fullRedraw)
     UPDATE_MP3
         our_eip=4;
     draw_screen_overlay();
+    put_sprite_list_on_screen();
+    draw_misc_info();
 
     if (fullRedraw)
     {
@@ -2518,8 +2559,10 @@ void render_graphics(IDriverDependantBitmap *extraBitmap, int extraX, int extraY
     construct_virtual_screen(false);
     our_eip=5;
 
-    if (extraBitmap != NULL)
+    if (extraBitmap != NULL) {
+        invalidate_sprite(extraX, extraY, extraBitmap);
         gfxDriver->DrawSprite(extraX, extraY, extraBitmap);
+    }
 
     update_screen();
 }

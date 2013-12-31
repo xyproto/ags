@@ -358,15 +358,13 @@ void MoveCharacterBlocking(int chaa,int xx,int yy,int direct) {
 
 int GetCharacterSpeechAnimationDelay(CharacterInfo *cha)
 {
-    if (game.Options[OPT_OLDTALKANIMSPD])
-    {
-        // The talkanim property only applies to Lucasarts style speech.
-        // Sierra style speech has a fixed delay of 5.
-        if (game.Options[OPT_SPEECHTYPE] == 0)
-            return play.SpeechAnimSpeed;
-        else
-            return 5;
-    }
+	if ((loaded_game_file_version < kGameVersion_312) && (game.options[OPT_SPEECHTYPE] != 0))
+	{
+		// legacy versions of AGS assigned a fixed delay to Sierra-style speech only
+		return 5;
+	}
+	if (game.options[OPT_GLOBALTALKANIMSPD] != 0)
+		return play.talkanim_speed;
     else
         return cha->speech_anim_speed;
 }

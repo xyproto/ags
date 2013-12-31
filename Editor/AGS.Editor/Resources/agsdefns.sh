@@ -6,6 +6,10 @@
 #define FontType int
 #define AudioType int
 #define MAX_INV 301
+#define MAX_ROOM_OBJECTS    40
+#define MAX_LEGACY_GLOBAL_VARS  50
+#define MAX_LISTBOX_SAVED_GAMES 50
+#define PALETTE_SIZE       256
 #define FOLLOW_EXACTLY 32766
 #define NARRATOR -1
 #define OPT_WALKONLOOK       2
@@ -158,7 +162,7 @@ enum VideoSkipStyle
 
 enum eKeyCode
 {
-  eNoKey    = 0,
+  eKeyNone  = 0,
   eKeyCtrlA = 1,
   eKeyCtrlB = 2,
   eKeyCtrlC = 3,
@@ -1601,6 +1605,8 @@ managed struct Dialog {
   import String GetOptionText(int option);
   /// Checks whether the player has chosen this option before.
   import bool HasOptionBeenChosen(int option);
+  /// Manually marks whether the option was chosen before or not.
+  import void SetHasOptionBeenChosen(int option, bool chosen);
   /// Sets the enabled state of the specified option in this dialog.
   import void SetOptionState(int option, DialogOptionState);
   /// Runs the dialog interactively.
@@ -1697,6 +1703,8 @@ managed struct DialogOptionsRenderingInfo {
   import attribute int X;
   /// The Y co-ordinate of the top-left corner of the dialog options
   import attribute int Y;
+  /// Should the drawing surface have alpha channel
+  import attribute bool HasAlphaChannel;
 };
 
 managed struct AudioChannel {
@@ -2028,7 +2036,7 @@ managed struct Character {
   readonly import attribute bool Speaking;
   /// Gets the current frame of the character's speaking animation (only valid when Speaking is true)
   readonly import attribute int SpeakingFrame;
-  /// Gets/sets the character's speech animation delay.
+  /// Gets/sets the character's speech animation delay (only if not using global setting).
   import attribute int  SpeechAnimationDelay;
   /// Gets/sets the character's speech text colour.
   import attribute int  SpeechColor;
@@ -2095,7 +2103,7 @@ struct GameState {
   int  disabled_user_interface;
   int  gscript_timer;
   int  debug_mode;
-  int  globalvars[50];
+  int  globalvars[MAX_LEGACY_GLOBAL_VARS];
   int  messagetime;   // for auto-remove messages
   int  usedinv;
 #ifdef STRICT
@@ -2142,7 +2150,12 @@ struct GameState {
   int  narrator_speech;
   int  ambient_sounds_persist;
   int  lipsync_speed;
+#ifdef STRICT
+  int  reserved__4;   // $AUTOCOMPLETEIGNORE$
+#endif
+#ifndef STRICT
   int  close_mouth_end_speech_time;
+#endif
   int  disable_antialiasing;
   int  text_speed_modifier;
   int  text_align;
@@ -2182,17 +2195,25 @@ struct GameState {
   int  stop_dialog_at_end;   // $AUTOCOMPLETEIGNORE$
   };
   
-enum SkipSpeechType {
+enum SkipSpeechStyle {
   eSkipKeyMouseTime = 0,
   eSkipKeyTime      = 1,
   eSkipTime         = 2,
   eSkipKeyMouse     = 3,
-  eSkipMouseTime    = 4
+  eSkipMouseTime    = 4,
+  eSkipKey          = 5,
+  eSkipMouse        = 6
 };
   
 managed struct Speech {
+  /// Stop speech animation this number of game loops before speech ends (text mode only).
+  import static attribute int             AnimationStopTimeMargin;
   /// Enables/disables the custom speech portrait placement.
   import static attribute bool            CustomPortraitPlacement;
+  /// Gets/sets extra time the speech will always stay on screen after its common time runs out.
+  import static attribute int             DisplayPostTimeMs;
+  /// Gets/sets global speech animation delay (if using global setting).
+  import static attribute int             GlobalSpeechAnimationDelay;
   /// Gets/sets speech portrait x offset relative to screen side.
   import static attribute int             PortraitXOffset;
   /// Gets/sets speech portrait y position.
@@ -2200,24 +2221,26 @@ managed struct Speech {
   /// Gets/sets specific key which can skip speech text.
   import static attribute eKeyCode        SkipKey;
   /// Gets/sets how the player can skip speech lines.
-  import static attribute SkipSpeechType  SkipType;
+  import static attribute SkipSpeechStyle SkipStyle;
   /// Gets/sets the style in which speech is displayed.
   import static attribute eSpeechStyle    Style;
   /// Gets/sets how text in message boxes and Sierra-style speech is aligned.
   import static attribute Alignment       TextAlignment;
+  /// Gets/sets whether speech animation delay should use global setting (or Character setting).
+  import static attribute bool            UseGlobalSpeechAnimationDelay;
   /// Gets/sets whether voice and/or text are used in the game.
   import static attribute eVoiceMode      VoiceMode;
 };
 
 
 import readonly Character *player;
-import Object object[40];
+import Object object[MAX_ROOM_OBJECTS];
 import Mouse mouse;
 import System system;
 import GameState  game;
-import int   gs_globals[50];
-import short savegameindex[20];
-import ColorType palette[256];
+import int   gs_globals[MAX_LEGACY_GLOBAL_VARS];
+import short savegameindex[MAX_LISTBOX_SAVED_GAMES];
+import ColorType palette[PALETTE_SIZE];
 
 #undef CursorMode
 #undef FontType

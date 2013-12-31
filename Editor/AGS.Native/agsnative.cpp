@@ -38,6 +38,7 @@ int mousex, mousey;
 #include "gfx/bitmap.h"
 #include "core/assetmanager.h"
 
+using AGS::Common::AlignedStream;
 using AGS::Common::Stream;
 namespace BitmapHelper = AGS::Common::BitmapHelper;
 
@@ -620,7 +621,7 @@ void wputblock_stretch(Common::Bitmap *g, int xpt,int ypt,Common::Bitmap *tblock
   else g->StretchBlt(tblock,RectWH(xpt,ypt,nsx,nsy), Common::kBitmap_Transparency);
 }
 
-void draw_sprite_compensate(Common::Bitmap *g, int sprnum, int atxp, int atyp, int seethru) {
+void draw_gui_sprite(Common::Bitmap *g, int sprnum, int atxp, int atyp, bool use_alpha) {
   Common::Bitmap *blptr = get_sprite(sprnum);
   Common::Bitmap *towrite=blptr;
   int needtofree=0, main_color_depth = thisgame.ColorDepth * 8;
@@ -1555,6 +1556,13 @@ void allocate_memory_for_views(int viewCount)
   thisgame.ViewNames.New(viewCount);
 }
 
+void ReadGameSetupStructBase_Aligned(Stream *in)
+{
+    GameSetupStructBase *gameBase = (GameSetupStructBase *)&thisgame;
+    AlignedStream align_s(in, Common::kAligned_Read);
+    gameBase->ReadFromFile(&align_s);
+}
+
 const char *load_dta_file_into_thisgame(const char *fileName)
 {
   int bb;
@@ -1580,11 +1588,7 @@ const char *load_dta_file_into_thisgame(const char *fileName)
   int stlen = iii->ReadInt32();
   iii->Seek(Common::kSeekCurrent, stlen);
 
-  {
-    Common::AlignedStream align_s(iii, Common::kAligned_Read);
-    thisgame.ReadBaseFromFile(&align_s);
-    align_s.Close();
-  }
+  ReadGameSetupStructBase_Aligned(iii);
 
   thisgame.FontFlags.ReadRaw(iii, thisgame.FontCount);
   thisgame.FontOutline.ReadRaw(iii, thisgame.FontCount);
@@ -1607,12 +1611,12 @@ const char *load_dta_file_into_thisgame(const char *fileName)
   numGlobalVars = iii->ReadInt32();
   iii->ReadArray (&globalvars[0], sizeof (InteractionVariable), numGlobalVars);
 
-  if (thisgame.LoadDictionary != NULL) {
+  if (thisgame.LoadDictionary) {
     thisgame.Dictionary = (WordsDictionary*)malloc(sizeof(WordsDictionary));
     read_dictionary (thisgame.Dictionary, iii);
   }
 
-  if (thisgame.LoadCompiledScript != NULL)
+  if (thisgame.LoadCompiledScript)
     thisgame.CompiledScript = ccScript::CreateFromStream(iii);
 
   load_script_modules_compiled(iii);
@@ -3922,7 +3926,9 @@ Game^ load_old_game_dta_file(const char *fileName)
 	game->Settings->EnforceObjectBasedScript = (thisgame.Options[OPT_STRICTSCRIPTING] != 0);
 	game->Settings->FontsForHiRes = (thisgame.Options[OPT_NOSCALEFNT] != 0);
 	game->Settings->GameName = gcnew String(thisgame.GameName);
+	game->Settings->UseGlobalSpeechAnimationDelay = true; // this was always on in pre-3.0 games
 	game->Settings->GUIAlphaStyle = GUIAlphaStyle::Classic;
+    game->Settings->SpriteAlphaStyle = SpriteAlphaStyle::Classic;
 	game->Settings->HandleInvClicksInScript = (thisgame.Options[OPT_HANDLEINVCLICKS] != 0);
 	game->Settings->InventoryCursors = !thisgame.Options[OPT_FIXEDINVCURSOR];
 	game->Settings->LeftToRightPrecedence = (thisgame.Options[OPT_LEFTTORIGHTEVAL] != 0);
@@ -4236,7 +4242,7 @@ Game^ load_old_game_dta_file(const char *fileName)
 		newGui->BackgroundColor = guis[i].BackgroundColor;
 		newGui->BackgroundImage = guis[i].BackgroundImage;
 		newGui->ID = i;
-        newGui->Name = gcnew String(Common::GuiMain::MakeScriptName(guis[i].Name));
+		newGui->Name = gcnew String(guis[i].name);
 
 		for (int j = 0; j < guis[i].ControlCount; j++)
 		{
@@ -4435,7 +4441,7 @@ AGS::Types::Room^ load_crm_file(UnloadedRoom ^roomToLoad)
     room->StateSaving = thisroom.IsPersistent;
 	room->BottomEdgeY = thisroom.Edges.Bottom;
 	room->LeftEdgeX = thisroom.Edges.Left;
-	room->MusicVolumeAdjustment = (RoomVolumeAdjustment)thisroom.Options[kRoomBaseOpt_MusicVolume];
+    room->MusicVolumeAdjustment = (AGS::Types::RoomVolumeAdjustment)thisroom.options[ST_VOLUME];
 	room->PlayerCharacterView = thisroom.Options[kRoomBaseOpt_PlayerCharacterView];
 	room->PlayMusicOnRoomLoad = thisroom.Options[kRoomBaseOpt_StartUpMusic];
 	room->RightEdgeX = thisroom.Edges.Right;
@@ -4622,6 +4628,9 @@ AGS::Types::Room^ load_crm_file(UnloadedRoom ^roomToLoad)
 
 void save_crm_file(Room ^room)
 {
+    thisroom.freemessage();
+    thisroom.freescripts();
+
 	thisroom.GameId = room->GameID;
 	thisroom.Edges.Bottom = room->BottomEdgeY;
 	thisroom.Edges.Left = room->LeftEdgeX;
@@ -4639,13 +4648,8 @@ void save_crm_file(Room ^room)
 	thisroom.BkgSceneAnimSpeed = room->BackgroundAnimationDelay;
 	thisroom.BkgSceneCount = room->BackgroundCount;
 
-	int i;
-	for (i = 0; i < thisroom.MessageCount; i++) 
-	{
-		thisroom.Messages[i].Free();
-	}
 	thisroom.MessageCount = room->Messages->Count;
-	for (i = 0; i < thisroom.MessageCount; i++) 
+	for (int i = 0; i < thisroom.nummes; i++) 
 	{
 		RoomMessage ^newMessage = room->Messages[i];
 		//thisroom.Messages[i] = (char*)malloc(newMessage->Text->Length + 1);
@@ -4666,7 +4670,7 @@ void save_crm_file(Room ^room)
 
 	thisroom.ObjectCount = room->Objects->Count;
     thisroom.Objects.SetLength(room->Objects->Count);
-	for (i = 0; i < thisroom.ObjectCount; i++) 
+	for (int i = 0; i < thisroom.numsprs; i++)
 	{
 		RoomObject ^obj = room->Objects[i];
 		ConvertStringToNativeString(obj->Name, thisroom.Objects[i].ScriptName);
@@ -4687,6 +4691,10 @@ void save_crm_file(Room ^room)
     copy_walkareas_to_native(room);
     copy_walkbehind_to_native(room);
     copy_regions_to_native(room);
+        if (thisroom.hotspotnames[i])
+        {
+            free(thisroom.hotspotnames[i]);
+        }
 
 	CompileCustomProperties(room->Properties, &thisroom.Properties);
 
@@ -4703,47 +4711,17 @@ void save_crm_file(Room ^room)
 
 	TempDataStorage::RoomBeingSaved = nullptr;
 
-	for (i = 0; i < thisroom.HotspotCount; i++) 
+	for (int i = 0; i < thisroom.numhotspots; i++) 
 	{
 		thisroom.Hotspots[i].Name.Free();
 	}
 }
-
-// [IKM] 2012-11-13: code moved to AGS.Types.FolderHelper
-/*
-static int CountViews(ViewFolder ^folder) 
-{
-	int highestViewNumber = 0;
-	for each (ViewFolder ^subFolder in folder->SubFolders)
-	{
-		int folderView = CountViews(subFolder);
-		if (folderView > highestViewNumber) 
-		{
-			highestViewNumber = folderView;
-		}
-	}
-	for each (View ^view in folder->Views)
-	{
-		if (view->ID > highestViewNumber)
-		{
-			highestViewNumber = view->ID;
-		}
-	}
-	return highestViewNumber;
-}
-*/
 
 ref class ManagedViewProcessing
 {
 public:
     static void ConvertViewsToDTAFormat(IViewFolder ^folder, Game ^game) 
     {
-        /*
-	    for each (ViewFolder ^subFolder in folder->SubFolders)
-	    {
-		    ConvertViewsToDTAFormat(subFolder, game);
-	    }
-        */
         AGS::Types::FolderHelper::ViewFolderProcessing ^del = 
             gcnew AGS::Types::FolderHelper::ViewFolderProcessing(ConvertViewsToDTAFormat);
         AGS::Types::FolderHelper::ForEachViewFolder(folder, game, del);
@@ -4826,9 +4804,18 @@ void serialize_room_interactions(Stream *ooo)
 	}
 }
 
+void WriteGameSetupStructBase_Aligned(Stream *out)
+{
+    GameSetupStructBase *gameBase = (GameSetupStructBase *)&thisgame;
+    AlignedStream align_s(out, Common::kAligned_Write);
+    gameBase->WriteToFile(&align_s);
+}
+
 void save_thisgame_to_file(const char *fileName, Game ^game)
 {
-	const char *AGS_VERSION = "3.3.0";
+    Common::String ags_version;
+    ConvertStringToNativeString(AGS::Types::Version::AGS_EDITOR_VERSION, ags_version);
+
   char textBuffer[500];
 	int bb;
 
@@ -4840,14 +4827,10 @@ void save_thisgame_to_file(const char *fileName, Game ^game)
 
   ooo->Write(game_file_sig,30);
   ooo->WriteInt32(kGameVersion_Current);
-  ooo->WriteInt32(strlen(AGS_VERSION));
-  ooo->Write(AGS_VERSION, strlen(AGS_VERSION));
+  ooo->WriteInt32(ags_version.GetLength());
+  ooo->Write(ags_version, ags_version.GetLength());
 
-  {
-    Common::AlignedStream align_s(ooo, Common::kAligned_Write);
-    thisgame.WriteBaseToFile(&align_s);
-    align_s.Close();
-  }
+  WriteGameSetupStructBase_Aligned(ooo);
 
   thisgame.Guid.WriteCount(ooo, MAX_GUID_LENGTH);
   thisgame.SavedGameFileExtension.WriteCount(ooo, MAX_SG_EXT_LENGTH);
@@ -4883,13 +4866,16 @@ void save_thisgame_to_file(const char *fileName, Game ^game)
   // Extract all the scripts we want to persist (all the non-headers, except
   // the global script which was already written)
   List<AGS::Types::Script^>^ scriptsToWrite = gcnew List<AGS::Types::Script^>();
-  for each (Script ^script in game->ScriptsToCompile)
+  for each (ScriptAndHeader ^scriptAndHeader in game->ScriptsToCompile)
   {
-	  if ((!script->IsHeader) && 
-      (!script->FileName->Equals(Script::GLOBAL_SCRIPT_FILE_NAME)) &&
-      (!script->FileName->Equals(Script::DIALOG_SCRIPTS_FILE_NAME)))
+	  AGS::Types::Script^ script = scriptAndHeader->Script;
+	  if (script != nullptr)
 	  {
-		  scriptsToWrite->Add(script);
+		  if ((!script->FileName->Equals(Script::GLOBAL_SCRIPT_FILE_NAME)) &&
+			 (!script->FileName->Equals(Script::DIALOG_SCRIPTS_FILE_NAME)))
+		  {
+			  scriptsToWrite->Add(script);
+		  }
 	  }
   }
 
@@ -5040,10 +5026,12 @@ void save_game_to_dta_file(Game^ game, const char *fileName)
 	thisgame.Options[OPT_NOSCALEFNT] = game->Settings->FontsForHiRes;
 	ConvertStringToNativeString(game->Settings->GameName, thisgame.GameName, 50);
 	thisgame.Options[OPT_NEWGUIALPHA] = (int)game->Settings->GUIAlphaStyle;
+    thisgame.options[OPT_SPRITEALPHA] = (int)game->Settings->SpriteAlphaStyle;
 	thisgame.Options[OPT_HANDLEINVCLICKS] = game->Settings->HandleInvClicksInScript;
 	thisgame.Options[OPT_FIXEDINVCURSOR] = !game->Settings->InventoryCursors;
-  thisgame.Options[OPT_OLDTALKANIMSPD] = game->Settings->LegacySpeechAnimationSpeed;
-	thisgame.Options[OPT_LEFTTORIGHTEVAL] = game->Settings->LeftToRightPrecedence;
+	thisgame.options[OPT_GLOBALTALKANIMSPD] = game->Settings->UseGlobalSpeechAnimationDelay ?
+        game->Settings->GlobalSpeechAnimationDelay : (-game->Settings->GlobalSpeechAnimationDelay - 1);
+        thisgame.Options[OPT_LEFTTORIGHTEVAL] = game->Settings->LeftToRightPrecedence;
 	thisgame.Options[OPT_LETTERBOX] = game->Settings->LetterboxMode;
   thisgame.TotalScore = game->Settings->MaximumScore;
 	thisgame.Options[OPT_MOUSEWHEEL] = game->Settings->MouseWheelEnabled;

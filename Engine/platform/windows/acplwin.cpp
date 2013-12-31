@@ -36,6 +36,7 @@
 #include "util/stream.h"
 
 using AGS::Common::Stream;
+using AGS::Common::String;
 using AGS::Common::Bitmap;
 
 extern int our_eip;
@@ -75,6 +76,9 @@ extern "C" extern LPDIRECTINPUTDEVICE key_dinput_device;
 
 char win32SavedGamesDirectory[MAX_PATH] = "\0";
 char win32AppDataDirectory[MAX_PATH] = "\0";
+String win32OutputDirectory;
+
+const unsigned int win32TimerPeriod = 1;
 
 extern "C" HWND allegro_wnd;
 extern void dxmedia_abort_video();
@@ -92,6 +96,7 @@ struct AGSWin32 : AGSPlatformDriver {
   virtual void Delay(int millis);
   virtual void DisplayAlert(const char*, ...);
   virtual const char *GetAllUsersDataDirectory();
+  virtual const char *GetAppOutputDirectory();
   virtual unsigned long GetDiskFreeSpaceMB();
   virtual const char* GetNoMouseErrorString();
   virtual eScriptSystemOSID GetSystemOSID();
@@ -499,6 +504,12 @@ void AGSWin32::UnRegisterGameWithGameExplorer()
 void AGSWin32::PostAllegroInit(bool windowed) 
 {
   check_parental_controls();
+
+  // Set the Windows timer resolution to 1 ms so that calls to
+  // Sleep() don't take more time than specified
+  MMRESULT result = timeBeginPeriod(win32TimerPeriod);
+  if (result != TIMERR_NOERROR)
+    platform->WriteDebugString("Failed to set the timer resolution to %d ms", win32TimerPeriod);
 }
 
 typedef UINT (CALLBACK* Dynamic_SHGetKnownFolderPathType) (GUID& rfid, DWORD dwFlags, HANDLE hToken, PWSTR *ppszPath); 
@@ -574,6 +585,31 @@ void determine_saved_games_folder()
   mkdir(win32SavedGamesDirectory);
 }
 
+void DetermineAppOutputDirectory()
+{
+  if (!win32OutputDirectory.IsEmpty())
+  {
+    return;
+  }
+
+  determine_saved_games_folder();
+  bool log_to_saves_dir = false;
+  if (win32SavedGamesDirectory[0])
+  {
+    win32OutputDirectory = win32SavedGamesDirectory;
+    win32OutputDirectory.Append("\\.ags");
+    log_to_saves_dir = mkdir(win32OutputDirectory) == 0 || errno == EEXIST;
+  }
+
+  if (!log_to_saves_dir)
+  {
+    char theexename[MAX_PATH + 1] = {0};
+    GetModuleFileName(NULL, theexename, MAX_PATH);
+    PathRemoveFileSpec(theexename);
+    win32OutputDirectory = theexename;
+  }
+}
+
 void AGSWin32::ReplaceSpecialPaths(const char *sourcePath, char *destPath) {
 
   determine_saved_games_folder();
@@ -599,6 +635,12 @@ const char* AGSWin32::GetAllUsersDataDirectory()
 {
   determine_app_data_folder();
   return &win32AppDataDirectory[0];
+}
+
+const char *AGSWin32::GetAppOutputDirectory()
+{
+  DetermineAppOutputDirectory();
+  return win32OutputDirectory;
 }
 
 void AGSWin32::DisplaySwitchOut() {
@@ -634,7 +676,7 @@ void AGSWin32::Delay(int millis)
     millis -= 5;
     // don't allow it to check for debug messages, since this Delay()
     // call might be from within a debugger polling loop
-    update_polled_stuff(false);
+    update_polled_mp3();
   }
 
   if (millis > 0)
@@ -737,6 +779,9 @@ void AGSWin32::AboutToQuitGame()
 
 void AGSWin32::PostAllegroExit() {
   allegro_wnd = NULL;
+
+  // Release the timer setting
+  timeEndPeriod(win32TimerPeriod);
 }
 
 int AGSWin32::RunSetup() {

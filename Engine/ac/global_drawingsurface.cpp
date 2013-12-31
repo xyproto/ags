@@ -29,6 +29,7 @@
 
 using AGS::Common::Bitmap;
 namespace BitmapHelper = AGS::Common::BitmapHelper;
+namespace GfxUtil = AGS::Engine::GfxUtil;
 
 extern Bitmap *raw_saved_screen;
 extern char lines[MAXLINE][200];
@@ -96,25 +97,27 @@ void RawDrawFrameTransparent (int frame, int translev) {
     if (frame == play.RoomBkgFrameIndex)
         quit("!RawDrawFrameTransparent: cannot draw current background onto itself");
 
-    if (translev == 0) {
-        // just draw it over the top, no transparency
-        thisroom.Backgrounds[play.RoomBkgFrameIndex].Graphic->Blit(thisroom.Backgrounds[frame].Graphic, 0, 0, 0, 0, thisroom.Backgrounds[frame].Graphic->GetWidth(), thisroom.Backgrounds[frame].Graphic->GetHeight());
-        play.RoomBkgWasModified[play.RoomBkgFrameIndex] = 1;
-        return;
-    }
-    // Draw it transparently
     RAW_START();
-    int trans_mode = ((100-translev) * 25) / 10;
-    AGS::Engine::GfxUtil::DrawSpriteWithTransparency (RAW_SURFACE(), thisroom.Backgrounds[frame].Graphic, 0, 0, trans_mode);
+    if (translev == 0)
+    {
+        // just draw it over the top, no transparency
+        RAW_SURFACE()->Blit(thisroom.ebscene[frame], 0, 0, 0, 0, thisroom.ebscene[frame]->GetWidth(), thisroom.ebscene[frame]->GetHeight());
+    }
+    else
+    {
+        // Draw it transparently
+        GfxUtil::DrawSpriteWithTransparency (RAW_SURFACE(), thisroom.ebscene[frame], 0, 0,
+            GfxUtil::Trans100ToAlpha255(translev));
+    }
     invalidate_screen();
     mark_current_background_dirty();
     RAW_END();
 }
 
 void RawClear (int clr) {
-    play.RoomBkgWasModified[play.RoomBkgFrameIndex] = 1;
+    RAW_START();
     clr = RAW_SURFACE()->GetCompatibleColor(clr);
-    thisroom.Backgrounds[play.RoomBkgFrameIndex].Graphic->Clear (clr);
+    RAW_SURFACE()->Clear (clr);
     invalidate_screen();
     mark_current_background_dirty();
 }
@@ -174,7 +177,7 @@ void RawPrintMessageWrapped (int xx, int yy, int wid, int font, int msgm) {
     RAW_END();
 }
 
-void RawDrawImageCore(int xx, int yy, int slot, int transparency) {
+void RawDrawImageCore(int xx, int yy, int slot, int alpha) {
     if ((slot < 0) || (slot >= MAX_SPRITES) || (spriteset[slot] == NULL))
         quit("!RawDrawImage: invalid sprite slot number specified");
     RAW_START();
@@ -183,7 +186,7 @@ void RawDrawImageCore(int xx, int yy, int slot, int transparency) {
         debug_log("RawDrawImage: Sprite %d colour depth %d-bit not same as background depth %d-bit", slot, spriteset[slot]->GetColorDepth(), RAW_SURFACE()->GetColorDepth());
     }
 
-    draw_sprite_support_alpha(RAW_SURFACE(), xx, yy, spriteset[slot], slot, transparency);
+    draw_sprite_slot_support_alpha(RAW_SURFACE(), false, xx, yy, slot, alpha);
     invalidate_screen();
     mark_current_background_dirty();
     RAW_END();
@@ -194,9 +197,9 @@ void RawDrawImage(int xx, int yy, int slot) {
     RawDrawImageCore(xx, yy, slot);
 }
 
-void RawDrawImageTrans(int xx, int yy, int slot, int transparency) {
+void RawDrawImageTrans(int xx, int yy, int slot, int alpha) {
     multiply_up_coordinates(&xx, &yy);
-    RawDrawImageCore(xx, yy, slot, transparency);
+    RawDrawImageCore(xx, yy, slot, alpha);
 }
 
 void RawDrawImageOffset(int xx, int yy, int slot) {
@@ -215,12 +218,30 @@ void RawDrawImageOffset(int xx, int yy, int slot) {
     RawDrawImageCore(xx, yy, slot);
 }
 
-void RawDrawImageTransparent(int xx, int yy, int slot, int trans) {
-    if ((trans < 0) || (trans > 100))
+void RawDrawImageTransparent(int xx, int yy, int slot, int legacy_transparency) {
+    if ((legacy_transparency < 0) || (legacy_transparency > 100))
         quit("!RawDrawImageTransparent: invalid transparency setting");
 
-    int trans_mode = (trans * 255) / 100;
-    RawDrawImageTrans(xx, yy, slot, trans_mode);
+    // WARNING: the previous versions of AGS actually had a bug:
+    // although manual stated that RawDrawImageTransparent takes % of transparency
+    // as an argument, that value was used improperly when setting up an Allegro's
+    // trans_blender, which caused it to act about as % of opacity instead, but
+    // with a twist.
+    //
+    // It was converted to 255-ranged "transparency" parameter:
+    // int transparency = (trans * 255) / 100;
+    //
+    // Note by CJ:
+    // Transparency is a bit counter-intuitive
+    // 0=not transparent, 255=invisible, 1..254 barely visible .. mostly visible
+    //
+    // In order to support this backward-compatible behavior, we convert the
+    // opacity into proper alpha this way:
+    // 0      => alpha 255
+    // 100    => alpha 0
+    // 1 - 99 => alpha 1 - 244
+    // 
+    RawDrawImageTrans(xx, yy, slot, GfxUtil::LegacyTrans100ToAlpha255(legacy_transparency));
 
     update_polled_stuff_if_runtime();  // this operation can be slow so stop music skipping
 }
@@ -244,7 +265,7 @@ void RawDrawImageResized(int xx, int yy, int gotSlot, int width, int height) {
     if (newPic->GetColorDepth() != RAW_SURFACE()->GetColorDepth())
         quit("!RawDrawImageResized: image colour depth mismatch: the background image must have the same colour depth as the sprite being drawn");
 
-    AGS::Engine::GfxUtil::DrawSpriteWithTransparency(RAW_SURFACE(), newPic, xx, yy);
+    GfxUtil::DrawSpriteWithTransparency(RAW_SURFACE(), newPic, xx, yy);
     delete newPic;
     invalidate_screen();
     mark_current_background_dirty();

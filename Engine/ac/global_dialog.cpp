@@ -16,9 +16,11 @@
 #include "ac/common.h"
 #include "ac/dialog.h"
 #include "debug/debug_log.h"
+#include "debug/debugger.h"
 #include "game/game_objects.h"
 #include "script/script.h"
 
+ScriptPosition last_in_dialog_request_script_pos;
 void RunDialog(int tum) {
     if ((tum<0) | (tum>=game.DialogCount))
         quit("!RunDialog: invalid topic number specified");
@@ -29,9 +31,12 @@ void RunDialog(int tum) {
         if (play.StopDialogAtEnd == DIALOG_RUNNING)
             play.StopDialogAtEnd = DIALOG_NEWTOPIC + tum;
         else
-            quit("!NewRoom: two NewRoom/RunDiaolg/StopDialog requests within dialog");
+            quitprintf("!RunDialog: two NewRoom/RunDialog/StopDialog requests within dialog; last was called in \"%s\", line %d",
+                        last_in_dialog_request_script_pos.Section.GetCStr(), last_in_dialog_request_script_pos.Line);
         return;
     }
+
+    get_script_position(last_in_dialog_request_script_pos);
 
     if (inside_script) 
         curscript->queue_action(ePSARunDialog, tum, "RunDialog");
@@ -46,6 +51,7 @@ void StopDialog() {
     DEBUG_CONSOLE("StopDialog called but no dialog");
     return;
   }
+  get_script_position(last_in_dialog_request_script_pos);
   play.StopDialogAtEnd = DIALOG_STOP;
 }
 

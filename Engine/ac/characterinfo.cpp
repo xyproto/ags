@@ -359,6 +359,8 @@ int CharacterInfo::update_character_animating(int &aa, int &doing_nothing)
         ((walking == 0) || ((flags & CHF_MOVENOTWALK) != 0)) &&
         (room == displayed_room)) 
     {
+      const bool is_voice = channels[SCHAN_SPEECH] != NULL;
+
       doing_nothing = 0;
       // idle anim doesn't count as doing something
       if (idleleft < 0)
@@ -370,7 +372,9 @@ int CharacterInfo::update_character_animating(int &aa, int &doing_nothing)
         int fraa = frame;
         wait = update_lip_sync (view, loop, &fraa) - 1;
         // closed mouth at end of sentence
-        if ((play.MessageTime >= 0) && (play.MessageTime < play.CloseMouthSpeechTime))
+        // NOTE: standard lip-sync is synchronized with text timer, not voice file
+        if (play.speech_in_post_state ||
+            (play.messagetime >= 0) && (play.messagetime < play.close_mouth_speech_time))
           frame = 0;
 
         if (frame != fraa) {
@@ -412,9 +416,10 @@ int CharacterInfo::update_character_animating(int &aa, int &doing_nothing)
           frame++;
 
         if ((aa == char_speaking) &&
-            (channels[SCHAN_SPEECH] == NULL) &&
-            (play.CloseMouthSpeechTime > 0) &&
-            (play.MessageTime < play.CloseMouthSpeechTime)) {
+             (play.speech_in_post_state ||
+             (!is_voice) &&
+             (play.close_mouth_speech_time > 0) &&
+             (play.messagetime < play.close_mouth_speech_time))) {
           // finished talking - stop animation
           animating = 0;
           frame = 0;

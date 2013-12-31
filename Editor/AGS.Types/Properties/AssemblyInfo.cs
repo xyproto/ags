@@ -30,9 +30,9 @@ namespace AGS.Types
             Release
         }
         public static readonly Type VERSION_TYPE = Type.Alpha;
-		public const string AGS_EDITOR_DATE = "July 2013";
-		public const string AGS_EDITOR_FRIENDLY_VERSION = "3.3.0";
-        public const string AGS_EDITOR_VERSION = "3.3.0.1139";
+		public const string AGS_EDITOR_DATE = "January 2014";
+		public const string AGS_EDITOR_FRIENDLY_VERSION = "3.4.0";
+        public const string AGS_EDITOR_VERSION = "3.4.0.1153";
         public const string AGS_EDITOR_COPYRIGHT = "Copyright © 2006-2011 Chris Jones and 2011-20xx others.";
 	}
 }

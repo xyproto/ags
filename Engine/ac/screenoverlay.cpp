@@ -56,7 +56,7 @@ void ScreenOverlay::Free()
 void ScreenOverlay::ReadFromFile(Stream *in)
 {
     // Skipping bmp and pic pointer values
-    in->ReadInt32();
+    in->ReadInt32(); // bmp
     hasSerializedBitmap = in->ReadInt32() != 0;
     type = in->ReadInt32();
     x = in->ReadInt32();
@@ -71,7 +71,7 @@ void ScreenOverlay::ReadFromFile(Stream *in)
 void ScreenOverlay::WriteToFile(Stream *out)
 {
     // Writing bitmap "pointers" to correspond to full structure writing
-    out->WriteInt32(0);
+    out->WriteInt32(0); // bmp
     out->WriteInt32(pic ? 1 : 0);
     out->WriteInt32(type);
     out->WriteInt32(x);

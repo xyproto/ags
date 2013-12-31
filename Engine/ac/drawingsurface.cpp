@@ -32,6 +32,7 @@
 
 using AGS::Common::Bitmap;
 namespace BitmapHelper = AGS::Common::BitmapHelper;
+namespace GfxUtil = AGS::Engine::GfxUtil;
 
 extern SpriteCache spriteset;
 extern int spritewidth[MAX_SPRITES],spriteheight[MAX_SPRITES];
@@ -203,8 +204,8 @@ void DrawingSurface_DrawSurface(ScriptDrawingSurface* target, ScriptDrawingSurfa
         quit("!DrawingSurface.DrawSurface: 256-colour surfaces cannot be drawn transparently");
 
     // Draw it transparently
-    int trans_mode = ((100-translev) * 25) / 10;
-    AGS::Engine::GfxUtil::DrawSpriteWithTransparency(ds, surfaceToDraw, 0, 0, trans_mode);
+    GfxUtil::DrawSpriteWithTransparency(ds, surfaceToDraw, 0, 0,
+        GfxUtil::Trans100ToAlpha255(translev));
     target->FinishedDrawing();
 }
 
@@ -251,13 +252,8 @@ void DrawingSurface_DrawImage(ScriptDrawingSurface* sds, int xx, int yy, int slo
         debug_log("RawDrawImage: Sprite %d colour depth %d-bit not same as background depth %d-bit", slot, spriteset[slot]->GetColorDepth(), ds->GetColorDepth());
     }
 
-    int trans_mode = 0;
-    if (trans > 0)
-    {
-        trans_mode = ((100 - trans) * 255) / 100;
-    }
-
-    draw_sprite_support_alpha(ds, xx, yy, sourcePic, slot, trans_mode);
+    draw_sprite_support_alpha(ds, sds->hasAlphaChannel != 0, xx, yy, sourcePic, (game.spriteflags[slot] & SPF_ALPHACHANNEL) != 0,
+        GfxUtil::Trans100ToAlpha255(trans));
 
     sds->FinishedDrawing();
 
