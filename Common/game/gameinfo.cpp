@@ -80,9 +80,7 @@ void GameInfo::ReadBaseFromFile(Stream *in)
     InvItemHotDotSprIndex   = in->ReadInt32();
     int32_t reserved[17];
     in->ReadArrayOfInt32(reserved, 17); // skip unused data
-    // read the final ptrs so we know to load dictionary, scripts etc
-    in->ReadArrayOfInt32(MessageToLoad, MAXGLOBALMES);
-
+    LoadMessages.ReadRaw(in, MAXGLOBALMES);
     LoadDictionary = in->ReadInt32() != 0; // dict
     // skip unused data
     in->ReadInt32(); // globalscript
@@ -395,7 +393,7 @@ void GameInfo::read_characters(Common::Stream *in, GAME_STRUCT_READ_DATA &read_d
         }
     }
 
-    if (read_data.filever <= kGameVersion_300) // fix character walk speed for < 3.1.1
+    if (read_data.filever <= kGameVersion_310) // fix character walk speed for < 3.1.1
     {
         for (int i = 0; i < CharacterCount; i++)
         {
@@ -427,7 +425,7 @@ void GameInfo::read_messages(Common::Stream *in, GAME_STRUCT_READ_DATA &read_dat
     char msg_buffer[500];
     GlobalMessages.New(MAXGLOBALMES);
     for (int ee=0;ee<MAXGLOBALMES;ee++) {
-        if (!MessageToLoad[ee])
+        if (!LoadMessages[ee])
         {
             continue;
         }
@@ -451,6 +449,7 @@ void GameInfo::read_messages(Common::Stream *in, GAME_STRUCT_READ_DATA &read_dat
             GlobalMessages[ee] = msg_buffer;
         }
     }
+    LoadMessages.Free();
 }
 
 void GameInfo::ReadCharacters_Aligned(Stream *in)
@@ -570,7 +569,7 @@ void GameInfo::read_audio(Common::Stream *in, GAME_STRUCT_READ_DATA &read_data)
 
 void GameInfo::read_room_names(Stream *in, GAME_STRUCT_READ_DATA &read_data)
 {
-    if ((read_data.filever >= kGameVersion_pre300) && (Options[OPT_DEBUGMODE] != 0))
+    if ((read_data.filever >= kGameVersion_301) && (Options[OPT_DEBUGMODE] != 0))
     {
         RoomCount = in->ReadInt32();
         RoomNumbers.New(RoomCount);
@@ -617,7 +616,7 @@ void GameInfo::ReadFromSavedGame_v321(Stream *in)
             in->ReadArrayOfInt32 (&CharacterInteractions[bb]->timesRun[0], MAX_NEWINTERACTION_EVENTS);
     }
 
-    in->ReadArrayOfInt32(&Options[0], OPT_HIGHESTOPTION+1);
+    in->ReadArrayOfInt32(&Options[0], OPT_HIGHESTOPTION_321 + 1);
     Options[OPT_LIPSYNCTEXT] = in->ReadByte();
 
     ReadCharacters_Aligned(in);
@@ -637,7 +636,7 @@ void GameInfo::WriteForSavedGame_v321(Stream *out)
         out->WriteArrayOfInt32 (&CharacterInteractions[bb]->timesRun[0], MAX_NEWINTERACTION_EVENTS); 
     }
 
-    out->WriteArrayOfInt32 (&Options[0], OPT_HIGHESTOPTION+1);
+    out->WriteArrayOfInt32 (&Options[0], OPT_HIGHESTOPTION_321 + 1);
     out->WriteInt8 (Options[OPT_LIPSYNCTEXT]);
 
     WriteCharacters_Aligned(out);

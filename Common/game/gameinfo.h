@@ -117,11 +117,12 @@ private:
 
 // TODO: all members are currently public; hide them later
 public:
+    static const int32_t MAX_OPTIONS = 100;
     //-----------------------------------------------------
     // Former members of GameSetupStructBase
     //-----------------------------------------------------
     String          GameName;
-    int32_t         Options[100];
+    int32_t         Options[MAX_OPTIONS];
     uint8_t         PaletteUses[256];
     color           DefaultPalette[256];
     int32_t         PlayerCharacterIndex; // TODO: use character pointer instead
@@ -151,7 +152,7 @@ public:
     int32_t         FontCount;
     int32_t         GuiCount;
     int32_t         MouseCursorCount;
-    int32_t         MessageToLoad[MAXGLOBALMES];
+    Array<bool>     LoadMessages;
     bool            LoadDictionary;
     int32_t         RoomCount;
     bool            LoadCompiledScript;

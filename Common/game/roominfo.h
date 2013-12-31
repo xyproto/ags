@@ -102,6 +102,23 @@ enum RoomBaseOptions
     MAX_ROOM_BASE_OPTIONS   = 10
 };
 
+enum RoomVolumeAdjustment
+{
+    kRoomVolumeQuietest = -3,
+    kRoomVolumeQuieter  = -2,
+    kRoomVolumeQuiet    = -1,
+    kRoomVolumeNormal   =  0,
+    kRoomVolumeLoud     =  1,
+    kRoomVolumeLouder   =  2,
+    kRoomVolumeLoudest  =  3,
+    // These two options are only settable at runtime by SetMusicVolume()
+    kRoomVolumeExtra1   =  4,
+    kRoomVolumeExtra2   =  5,
+
+    kRoomVolumeMin      = kRoomVolumeQuietest,
+    kRoomVolumeMax      = kRoomVolumeExtra2,
+};
+
 #define NOT_VECTOR_SCALED -10000
 #define TINT_IS_ENABLED 0x80000000
 #define NO_GAME_ID_IN_ROOM_FILE 16325
