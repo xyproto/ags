@@ -42,7 +42,7 @@ GuiListBox::GuiListBox()
 
 int GuiListBox::GetItemAt(int x, int y)
 {
-    if (IsInRightMargin(x))
+    if (RowHeight <= 0 || IsInRightMargin(x))
     {
         return -1;
     }

@@ -278,7 +278,7 @@ void GuiButton::DrawImageButton(Bitmap *ds, bool draw_disabled)
     }
     if (spriteset[CurrentImage] != NULL)
     {
-        draw_sprite_compensate(ds, CurrentImage, Frame.Left, Frame.Top, 1);
+        draw_gui_sprite(ds, CurrentImage, Frame.Left, Frame.Top, true);
     }
 
     // Draw active inventory item
@@ -301,9 +301,10 @@ void GuiButton::DrawImageButton(Bitmap *ds, bool draw_disabled)
         switch (placeholder)
         {
         case kGuiBtnPlaceholder_InvItemCenter:
-            draw_sprite_compensate(ds, gui_inv_pic,
+            draw_gui_sprite(ds, gui_inv_pic,
                 Frame.Left + Frame.GetWidth() / 2 - get_adjusted_spritewidth(gui_inv_pic) / 2,
-                Frame.Top + Frame.GetHeight() / 2 - get_adjusted_spriteheight(gui_inv_pic) / 2, 1);
+                Frame.Top + Frame.GetHeight() / 2 - get_adjusted_spriteheight(gui_inv_pic) / 2,
+                true);
             break;
         case kGuiBtnPlaceholder_InvItemStretch:
             ds->StretchBlt(spriteset[gui_inv_pic], RectWH(Frame.Left + 3, Frame.Top + 3, Frame.GetWidth() - 6, Frame.GetHeight() - 6), Common::kBitmap_Transparency);

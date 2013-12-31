@@ -53,21 +53,6 @@ GuiMain::GuiMain()
     return name;
 }
 
-/* static */ String GuiMain::MakeScriptName(const String &name)
-{
-    if (name.IsEmpty())
-    {
-        return name;
-    }
-    else
-    {
-        String script_name = String::FromFormat("g%s", name);
-        script_name.MakeLower();
-        script_name.SetAt(1, toupper(script_name[1]));
-        return script_name;
-    }
-}
-
 void GuiMain::Init()
 {
     Id                  = 0;
@@ -160,22 +145,6 @@ GuiControlType GuiMain::GetControlType(int index) const
         return kGuiControlUndefined;
     }
     return (GuiControlType)((ControlRefs[index] >> 16) & 0xFFFF);
-}
-
-bool GuiMain::HasAlphaChannel() const
-{
-    if (BackgroundImage > 0)
-    {
-        // alpha state depends IsVisible background image
-        return is_sprite_alpha(BackgroundImage);
-    }
-    if (BackgroundColor > 0)
-    {
-        // not alpha transparent if there is a background color
-        return false;
-    }
-    // transparent background, enable alpha blending
-    return (final_col_dep >= 24);
 }
 
 bool GuiMain::IsMouseOnGui() const
@@ -385,7 +354,7 @@ void GuiMain::DrawAt(Bitmap *ds, int x, int y)
     SET_EIP(378)
 
     if (BackgroundImage > 0 && (spriteset[BackgroundImage] != NULL))
-    draw_sprite_compensate(&subbmp, BackgroundImage, 0, 0, 0);
+    draw_gui_sprite(&subbmp, BackgroundImage, 0, 0, false);
     SET_EIP(379)
 
     for (int ctrl_index = 0; ctrl_index < ControlCount; ++ctrl_index)

@@ -129,7 +129,7 @@ void GuiSlider::Draw(Common::Bitmap *ds)
         // draw the tiled background image
         do
         {
-            draw_sprite_compensate(ds, BackgroundImage, cx, cy, 1);
+            draw_gui_sprite(ds, BackgroundImage, cx, cy, true);
             cx += x_inc;
             cy += y_inc;
             // done as a do..while so that at least one of the image is drawn
@@ -157,7 +157,7 @@ void GuiSlider::Draw(Common::Bitmap *ds)
         }
         handle_frame.Left -= get_adjusted_spritewidth(HandleImage) / 2;
         handle_frame.Top -= get_adjusted_spriteheight(HandleImage) / 2;
-        draw_sprite_compensate(ds, HandleImage, handle_frame.Left, handle_frame.Top, 1);
+        draw_gui_sprite(ds, HandleImage, handle_frame.Left, handle_frame.Top, true);
         handle_frame.Right = handle_frame.Left + get_adjusted_spritewidth(HandleImage);
         handle_frame.Bottom = handle_frame.Top + get_adjusted_spriteheight(HandleImage);
     }

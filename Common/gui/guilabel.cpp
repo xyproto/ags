@@ -12,6 +12,7 @@
 //
 //=============================================================================
 
+#include "ac/game_version.h"
 #include "font/fonts.h"
 #include "gui/guilabel.h"
 #include "gui/guimain.h"
@@ -51,14 +52,13 @@ void GuiLabel::Draw(Common::Bitmap *ds)
 
     color_t text_color = ds->GetCompatibleColor(TextColor);
     int text_height = wgettextheight("ZhypjIHQFb", TextFont) + 1;
-    for (int i = 0, at_y = Frame.Top; i < line_count; ++i)
+    // < 2.72 labels did not limit vertical size of text
+    const bool limit_by_label_frame = loaded_game_file_version >= kGameVersion_272;
+    for (int i = 0, at_y = Frame.Top;
+        i < line_count && (!limit_by_label_frame || at_y <= Frame.Bottom);
+        ++i, at_y += text_height)
     {
         DrawAlignedText(ds, at_y, text_color, lines[i]);
-        at_y += text_height;
-        if (at_y > Frame.Bottom)
-        {
-            break;
-        }
     }
 }
 
