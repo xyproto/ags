@@ -118,13 +118,16 @@ private:
 // TODO: all members are currently public; hide them later
 public:
     static const int32_t MAX_OPTIONS = 100;
+    static const size_t  MAX_GAME_NAME_LENGTH = 50;
+    static const size_t  PALETTE_SIZE = 256;
+    static const size_t  RESERVED_INTS = 17;
     //-----------------------------------------------------
     // Former members of GameSetupStructBase
     //-----------------------------------------------------
     String          GameName;
     int32_t         Options[MAX_OPTIONS];
-    uint8_t         PaletteUses[256];
-    color           DefaultPalette[256];
+    uint8_t         PaletteUses[PALETTE_SIZE];
+    color           DefaultPalette[PALETTE_SIZE];
     int32_t         PlayerCharacterIndex; // TODO: use character pointer instead
     int32_t         TotalScore; // max game score points
     int32_t         ColorDepth; // in bytes per pixel
@@ -152,7 +155,7 @@ public:
     int32_t         FontCount;
     int32_t         GuiCount;
     int32_t         MouseCursorCount;
-    Array<bool>     LoadMessages;
+    Array<int32_t>  LoadMessages;
     bool            LoadDictionary;
     int32_t         RoomCount;
     bool            LoadCompiledScript;

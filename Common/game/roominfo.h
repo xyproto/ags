@@ -253,6 +253,11 @@ public:
     static bool     Load(RoomInfo &room, const String &filename, int id, bool game_is_hires);
 
     void            Free();
+    // These two methods are required only for AGS.Native, they need to be
+    // removed (or moved to private section) when AGS.Native is refactored.
+    void            FreeMessages();
+    void            FreeScripts();
+
     RoomInfoError   ReadFromFile(Stream *in, int id, bool game_is_hires, RoomFormatBlock *last_block = NULL);
     void            WriteToFile(Stream *out);
 

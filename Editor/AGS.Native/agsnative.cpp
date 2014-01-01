@@ -4627,7 +4627,7 @@ AGS::Types::Room^ load_crm_file(UnloadedRoom ^roomToLoad)
 
 void save_crm_file(Room ^room)
 {
-    thisroom.Free();
+    thisroom.FreeScripts();
 
 	thisroom.GameId = room->GameID;
 	thisroom.Edges.Bottom = room->BottomEdgeY;
@@ -4647,6 +4647,8 @@ void save_crm_file(Room ^room)
 	thisroom.BkgSceneCount = room->BackgroundCount;
 
 	thisroom.MessageCount = room->Messages->Count;
+    thisroom.Messages.SetLength(thisroom.MessageCount);
+    thisroom.MessageInfos.SetLength(thisroom.MessageCount);
 	for (int i = 0; i < thisroom.MessageCount; i++) 
 	{
 		RoomMessage ^newMessage = room->Messages[i];

@@ -178,23 +178,47 @@ void RoomInfo::Free()
     WalkAreas.Free();
     WalkBehinds.Free();
     
+    FreeMessages();
+    FreeScripts();
+
+    LocalVariables.Free();
+}
+
+void RoomInfo::FreeMessages()
+{
     Messages.Free();
     MessageInfos.Free();
-    
-    EventHandlers.Free();
-    LocalVariables.Free();
-    
+}
+
+void RoomInfo::FreeScripts()
+{
     if (TextScript)
     {
         free(TextScript);
         TextScript = NULL;
     }
+
     if (!CompiledScriptShared)
     {
         delete CompiledScript;
     }
     CompiledScript = NULL;
     CompiledScriptShared = false;
+
+    EventHandlers.Free();
+
+    for (int i = 0; i < Hotspots.GetCount(); ++i)
+    {
+        Hotspots[i].EventHandlers.Free();
+    }
+    for (int i = 0; i < Objects.GetCount(); ++i)
+    {
+        Objects[i].EventHandlers.Free();
+    }
+    for (int i = 0; i < Regions.GetCount(); ++i)
+    {
+        Regions[i].EventHandlers.Free();
+    }
 }
 
 RoomInfoError RoomInfo::ReadFromFile(Stream *in, int id, bool game_is_hires, RoomFormatBlock *last_block)

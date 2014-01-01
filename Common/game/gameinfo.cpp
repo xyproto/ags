@@ -54,11 +54,11 @@ GameInfo::~GameInfo()
 
 void GameInfo::ReadBaseFromFile(Stream *in)
 {
-    GameName.ReadCount(in, 50);
-    in->ReadArrayOfInt32(Options, 100);
-    in->Read(PaletteUses, 256);
+    GameName.ReadCount(in, MAX_GAME_NAME_LENGTH);
+    in->ReadArrayOfInt32(Options, MAX_OPTIONS);
+    in->Read(PaletteUses, PALETTE_SIZE);
     // colors are an array of bytes
-    in->Read(DefaultPalette, sizeof(color)*256);
+    in->Read(DefaultPalette, sizeof(color) * PALETTE_SIZE);
     ViewCount               = in->ReadInt32();
     CharacterCount          = in->ReadInt32();
     PlayerCharacterIndex    = in->ReadInt32();
@@ -78,8 +78,8 @@ void GameInfo::ReadBaseFromFile(Stream *in)
     DefaultResolution       = in->ReadInt32();
     DefaultLipSyncFrame     = in->ReadInt32();
     InvItemHotDotSprIndex   = in->ReadInt32();
-    int32_t reserved[17];
-    in->ReadArrayOfInt32(reserved, 17); // skip unused data
+    int32_t reserved[RESERVED_INTS];
+    in->ReadArrayOfInt32(reserved, RESERVED_INTS); // skip unused data
     LoadMessages.ReadRaw(in, MAXGLOBALMES);
     LoadDictionary = in->ReadInt32() != 0; // dict
     // skip unused data
@@ -90,11 +90,11 @@ void GameInfo::ReadBaseFromFile(Stream *in)
 
 void GameInfo::WriteBaseToFile(Stream *out)
 {
-    GameName.WriteCount(out, 50);
-    out->WriteArrayOfInt32(Options, 100);
-    out->Write(PaletteUses, 256);
+    GameName.WriteCount(out, MAX_GAME_NAME_LENGTH);
+    out->WriteArrayOfInt32(Options, MAX_OPTIONS);
+    out->Write(PaletteUses, PALETTE_SIZE);
     // colors are an array of bytes
-    out->Write(&DefaultPalette[0], sizeof(color)*256);
+    out->Write(&DefaultPalette[0], sizeof(color) * PALETTE_SIZE);
     out->WriteInt32(ViewCount);
     out->WriteInt32(CharacterCount);
     out->WriteInt32(PlayerCharacterIndex);
@@ -114,8 +114,8 @@ void GameInfo::WriteBaseToFile(Stream *out)
     out->WriteInt32(DefaultResolution);
     out->WriteInt32(DefaultLipSyncFrame);
     out->WriteInt32(InvItemHotDotSprIndex);
-    int32_t reserved[17];
-    out->WriteArrayOfInt32(reserved, 17);
+    int32_t reserved[RESERVED_INTS];
+    out->WriteArrayOfInt32(reserved, RESERVED_INTS);
     // write the final ptrs so we know to load dictionary, scripts etc
     for (int i = 0; i < MAXGLOBALMES; ++i)
     {
