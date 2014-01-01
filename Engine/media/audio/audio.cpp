@@ -370,6 +370,7 @@ ScriptAudioChannel* play_audio_clip_on_channel(int channel, ScriptAudioClip *cli
     }
 
     // Mute the audio clip if fast-forwarding the cutscene
+    if (play.FastForwardCutscene) 
     {
         soundfx->set_volume_override(0);
 
