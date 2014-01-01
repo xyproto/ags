@@ -298,6 +298,7 @@ void quit(const char *quitmsg) {
     thisroom.Free();
     CharActiveSprites.Free();
     ObjActiveSprites.Free();
+    WalkBehindPlacements.Free();
 
     graphics_mode_shutdown();
 
@@ -306,7 +307,6 @@ void quit(const char *quitmsg) {
     // remove the game window
     allegro_exit();
 
-    WalkBehindPlacements.Free();
     platform->PostAllegroExit();
 
     our_eip = 9903;
