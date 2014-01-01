@@ -91,12 +91,12 @@ SkipSpeechStyle internal_skip_speech_to_user(int internal_val)
 
 RuntimeScriptValue Sc_Speech_GetAnimationStopTimeMargin(const RuntimeScriptValue *params, int32_t param_count)
 {
-    API_VARGET_INT(play.close_mouth_speech_time);
+    API_VARGET_INT(play.CloseMouthSpeechTime);
 }
 
 RuntimeScriptValue Sc_Speech_SetAnimationStopTimeMargin(const RuntimeScriptValue *params, int32_t param_count)
 {
-    API_VARSET_PINT(play.close_mouth_speech_time);
+    API_VARSET_PINT(play.CloseMouthSpeechTime);
 }
 
 RuntimeScriptValue Sc_Speech_GetCustomPortraitPlacement(const RuntimeScriptValue *params, int32_t param_count)
@@ -111,24 +111,24 @@ RuntimeScriptValue Sc_Speech_SetCustomPortraitPlacement(const RuntimeScriptValue
 
 RuntimeScriptValue Sc_Speech_GetDisplayPostTimeMs(const RuntimeScriptValue *params, int32_t param_count)
 {
-    API_VARGET_INT(play.speech_display_post_time_ms);
+    API_VARGET_INT(play.SpeechDisplayPostTimeMs);
 }
 
 RuntimeScriptValue Sc_Speech_SetDisplayPostTimeMs(const RuntimeScriptValue *params, int32_t param_count)
 {
-    API_VARSET_PINT(play.speech_display_post_time_ms);
+    API_VARSET_PINT(play.SpeechDisplayPostTimeMs);
 }
 
 RuntimeScriptValue Sc_Speech_GetGlobalSpeechAnimationDelay(const RuntimeScriptValue *params, int32_t param_count)
 {
-	API_VARGET_INT(play.talkanim_speed);
+	API_VARGET_INT(play.SpeechAnimSpeed);
 }
 
 RuntimeScriptValue Sc_Speech_SetGlobalSpeechAnimationDelay(const RuntimeScriptValue *params, int32_t param_count)
 {
-	if (game.options[OPT_GLOBALTALKANIMSPD] == 0)
+	if (game.Options[OPT_GLOBALTALKANIMSPD] == 0)
 		quit("!Speech.GlobalSpeechAnimationDelay cannot be set when global speech animation speed is not enabled; set Speech.UseGlobalSpeechAnimationDelay first!");
-	API_VARSET_PINT(play.talkanim_speed);
+	API_VARSET_PINT(play.SpeechAnimSpeed);
 }
 
 RuntimeScriptValue Sc_Speech_GetPortraitXOffset(const RuntimeScriptValue *params, int32_t param_count)
@@ -187,12 +187,12 @@ RuntimeScriptValue Sc_Speech_SetTextAlignment(const RuntimeScriptValue *params, 
 
 RuntimeScriptValue Sc_Speech_GetUseGlobalSpeechAnimationDelay(const RuntimeScriptValue *params, int32_t param_count)
 {
-	API_VARGET_INT(game.options[OPT_GLOBALTALKANIMSPD]);
+	API_VARGET_INT(game.Options[OPT_GLOBALTALKANIMSPD]);
 }
 
 RuntimeScriptValue Sc_Speech_SetUseGlobalSpeechAnimationDelay(const RuntimeScriptValue *params, int32_t param_count)
 {
-	API_VARSET_PINT(game.options[OPT_GLOBALTALKANIMSPD]);
+	API_VARSET_PINT(game.Options[OPT_GLOBALTALKANIMSPD]);
 }
 
 RuntimeScriptValue Sc_Speech_GetVoiceMode(const RuntimeScriptValue *params, int32_t param_count)

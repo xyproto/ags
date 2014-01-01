@@ -105,10 +105,10 @@ void set_mouse_cursor(int newcurs) {
                 //abuf = dotted_mouse_cursor;
 
                 draw_sprite_slot_support_alpha(dotted_mouse_cursor,
-                    (game.spriteflags[game.mcurs[newcurs].pic] & SPF_ALPHACHANNEL) != 0,
-                    hotspotx - spritewidth[game.invhotdotsprite] / 2,
-                    hotspoty - spriteheight[game.invhotdotsprite] / 2,
-                    game.invhotdotsprite);
+                    (game.SpriteFlags[game.MouseCursors[newcurs].pic] & SPF_ALPHACHANNEL) != 0,
+                    hotspotx - spritewidth[game.InvItemHotDotSprIndex] / 2,
+                    hotspoty - spriteheight[game.InvItemHotDotSprIndex] / 2,
+                    game.InvItemHotDotSprIndex);
 
                 //abuf = abufWas;
             }

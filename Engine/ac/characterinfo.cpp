@@ -373,8 +373,8 @@ int CharacterInfo::update_character_animating(int &aa, int &doing_nothing)
         wait = update_lip_sync (view, loop, &fraa) - 1;
         // closed mouth at end of sentence
         // NOTE: standard lip-sync is synchronized with text timer, not voice file
-        if (play.speech_in_post_state ||
-            (play.messagetime >= 0) && (play.messagetime < play.close_mouth_speech_time))
+        if (play.SpeechInPostState ||
+            (play.MessageTime >= 0) && (play.MessageTime < play.CloseMouthSpeechTime))
           frame = 0;
 
         if (frame != fraa) {
@@ -416,10 +416,10 @@ int CharacterInfo::update_character_animating(int &aa, int &doing_nothing)
           frame++;
 
         if ((aa == char_speaking) &&
-             (play.speech_in_post_state ||
+             (play.SpeechInPostState ||
              (!is_voice) &&
-             (play.close_mouth_speech_time > 0) &&
-             (play.messagetime < play.close_mouth_speech_time))) {
+             (play.CloseMouthSpeechTime > 0) &&
+             (play.MessageTime < play.CloseMouthSpeechTime))) {
           // finished talking - stop animation
           animating = 0;
           frame = 0;

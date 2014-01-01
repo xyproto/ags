@@ -1370,7 +1370,7 @@ void Character_SetSpeechColor(CharacterInfo *chaa, int ncol) {
 
 void Character_SetSpeechAnimationDelay(CharacterInfo *chaa, int newDelay)
 {
-	if (game.options[OPT_GLOBALTALKANIMSPD] != 0)
+	if (game.Options[OPT_GLOBALTALKANIMSPD] != 0)
         quit("!Character.SpeechAnimationDelay cannot be set when global speech animation speed is enabled");
 
     chaa->speech_anim_speed = newDelay;
@@ -2231,7 +2231,7 @@ void _displayspeech(char*texx, int aschar, int xx, int yy, int widd, int isThoug
     }
 
     play.MessageTime = GetTextDisplayTime(texx);
-    play.speech_in_post_state = false;
+    play.SpeechInPostState = false;
 
     if (isPause) {
         if (update_music_at > 0)
@@ -2492,7 +2492,7 @@ void _displayspeech(char*texx, int aschar, int xx, int yy, int widd, int isThoug
                     tdyp = ovr_yp + get_textwindow_top_border_height(play.SpeechTextWindowGuiIndex);
             }
             const ViewFrame *vf = &viptr->loops[0].frames[0];
-            const bool closeupface_has_alpha = (game.spriteflags[vf->pic] & SPF_ALPHACHANNEL) != 0;
+            const bool closeupface_has_alpha = (game.SpriteFlags[vf->pic] & SPF_ALPHACHANNEL) != 0;
             DrawViewFrame(closeupface, vf, view_frame_x, view_frame_y);
 
             int overlay_x = get_fixed_pixel_size(10);

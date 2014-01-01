@@ -101,12 +101,12 @@ void RawDrawFrameTransparent (int frame, int translev) {
     if (translev == 0)
     {
         // just draw it over the top, no transparency
-        RAW_SURFACE()->Blit(thisroom.ebscene[frame], 0, 0, 0, 0, thisroom.ebscene[frame]->GetWidth(), thisroom.ebscene[frame]->GetHeight());
+        RAW_SURFACE()->Blit(thisroom.Backgrounds[frame].Graphic, 0, 0, 0, 0, thisroom.Backgrounds[frame].Graphic->GetWidth(), thisroom.Backgrounds[frame].Graphic->GetHeight());
     }
     else
     {
         // Draw it transparently
-        GfxUtil::DrawSpriteWithTransparency (RAW_SURFACE(), thisroom.ebscene[frame], 0, 0,
+        GfxUtil::DrawSpriteWithTransparency (RAW_SURFACE(), thisroom.Backgrounds[frame].Graphic, 0, 0,
             GfxUtil::Trans100ToAlpha255(translev));
     }
     invalidate_screen();

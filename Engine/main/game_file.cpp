@@ -578,12 +578,12 @@ int load_game_file() {
     if (filever < kGameVersion_312)
     {
         // Fix animation speed for old formats
-		game.options[OPT_GLOBALTALKANIMSPD] = 5;
+		game.Options[OPT_GLOBALTALKANIMSPD] = 5;
     }
     else if (filever < kGameVersion_330)
     {
         // Convert game option for 3.1.2 - 3.2 games
-        game.options[OPT_GLOBALTALKANIMSPD] = game.options[OPT_GLOBALTALKANIMSPD] != 0 ? 5 : (-5 - 1);
+        game.Options[OPT_GLOBALTALKANIMSPD] = game.Options[OPT_GLOBALTALKANIMSPD] != 0 ? 5 : (-5 - 1);
     }
 
     if (game.FontCount > MAX_FONTS)
@@ -599,7 +599,7 @@ int load_game_file() {
     game.ReadExtFromFile_Part1(in, read_data);
     //-----------------------------------------------------
 
-    if (!game.load_compiled_script)
+    if (!game.LoadCompiledScript)
         quit("No global script in game; data load error");
 
     gamescript = ccScript::CreateFromStream(in);

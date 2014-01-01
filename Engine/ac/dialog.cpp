@@ -122,18 +122,18 @@ int Dialog_HasOptionBeenChosen(ScriptDialog *sd, int option)
 
 void Dialog_SetHasOptionBeenChosen(ScriptDialog *sd, int option, bool chosen)
 {
-    if (option < 1 || option > dialog[sd->id].numoptions)
+    if (option < 1 || option > dialog[sd->id].OptionCount)
     {
         quit("!Dialog.HasOptionBeenChosen: Invalid option number specified");
     }
     option--;
     if (chosen)
     {
-        dialog[sd->id].optionflags[option] |= DFLG_HASBEENCHOSEN;
+        dialog[sd->id].Options[option].Flags |= Common::kDialogOption_HasBeenChosen;
     }
     else
     {
-        dialog[sd->id].optionflags[option] &= ~DFLG_HASBEENCHOSEN;
+        dialog[sd->id].Options[option].Flags &= ~Common::kDialogOption_HasBeenChosen;
     }
 }
 
@@ -359,9 +359,9 @@ int write_dialog_options(Bitmap *ds, bool ds_has_alpha, int dlgxp, int curyp, in
 
     break_up_text_into_lines(areawid-(8+bullet_wid),usingfont,get_translation(dtop->Options[disporder[ww]].Name));
     dispyp[ww]=curyp;
-    if (game.dialog_bullet > 0)
+    if (game.DialogBulletSprIndex > 0)
     {
-        draw_gui_sprite_v330(ds, game.dialog_bullet, dlgxp, curyp, ds_has_alpha);
+        draw_gui_sprite_v330(ds, game.DialogBulletSprIndex, dlgxp, curyp, ds_has_alpha);
     }
     int cc;
     if (game.Options[OPT_DIALOGNUMBERED]) {
@@ -400,8 +400,8 @@ void draw_gui_for_dialog_options(Bitmap *ds, GuiMain *guib, int dlgxp, int dlgyp
     color_t draw_color = ds->GetCompatibleColor(guib->BackgroundColor);
     ds->FillRect(Rect(dlgxp, dlgyp, dlgxp + guib->GetWidth(), dlgyp + guib->GetHeight()), draw_color);
   }
-  if (guib->bgpic > 0)
-      GfxUtil::DrawSpriteWithTransparency(ds, spriteset[guib->bgpic], dlgxp, dlgyp);
+  if (guib->BackgroundImage > 0)
+      GfxUtil::DrawSpriteWithTransparency(ds, spriteset[guib->BackgroundImage], dlgxp, dlgyp);
 }
 
 bool get_custom_dialog_options_dimensions(int dlgnum)
@@ -598,7 +598,7 @@ void DialogOptions::Show()
         dirtyy = dlgyp;
         dirtywidth = guib->GetWidth();
         dirtyheight = guib->GetHeight();
-        dialog_abs_x = guib->x;
+        dialog_abs_x = guib->GetX();
 
         areawid=guib->GetWidth() - 5;
 
@@ -717,7 +717,7 @@ void DialogOptions::Redraw()
       push_screen(ds);
       Bitmap *text_window_ds = ds;
       draw_text_window(&text_window_ds, false, &txoffs,&tyoffs,&xspos,&yspos,&areawid,NULL,needheight, game.Options[OPT_DIALOGIFACE]);
-      options_surface_has_alpha = guis[game.options[OPT_DIALOGIFACE]].is_alpha();
+      options_surface_has_alpha = guis[game.Options[OPT_DIALOGIFACE]].HasAlphaChannel();
       ds = pop_screen();
       // snice draw_text_window incrases the width, restore it
       areawid = savedwid;
@@ -766,7 +766,7 @@ void DialogOptions::Redraw()
         GuiMain* guib = &guis[game.Options[OPT_DIALOGIFACE]];
         dirtyheight = guib->GetHeight();
         dirtyy = dlgyp;
-        options_surface_has_alpha = guib->is_alpha();
+        options_surface_has_alpha = guib->HasAlphaChannel();
       }
       else
       {
@@ -804,9 +804,9 @@ void DialogOptions::Redraw()
       if (mouseison == DLG_OPTION_PARSER)
         parserInput->TextColor = forecol;
 
-      if (game.dialog_bullet)  // the parser X will get moved in a second
+      if (game.DialogBulletSprIndex)  // the parser X will get moved in a second
       {
-          draw_gui_sprite_v330(ds, game.dialog_bullet, parserInput->x, parserInput->y, options_surface_has_alpha);
+          draw_gui_sprite_v330(ds, game.DialogBulletSprIndex, parserInput->GetX(), parserInput->GetY(), options_surface_has_alpha);
       }
 
       parserInput->SetWidth(parserInput->GetWidth() - bullet_wid);

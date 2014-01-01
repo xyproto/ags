@@ -307,7 +307,7 @@ void SetMusicMasterVolume(int newvol) {
         -LegacyMusicMasterVolumeAdjustment - (kRoomVolumeMax * LegacyRoomVolumeFactor);
     if ((newvol < min_volume) | (newvol>100))
         quitprintf("!SetMusicMasterVolume: invalid volume - must be from %d to %d", min_volume, 100);
-    play.music_master_volume=newvol+LegacyMusicMasterVolumeAdjustment;
+    play.MusicMasterVolume=newvol+LegacyMusicMasterVolumeAdjustment;
     update_music_volume();
 }
 
@@ -397,7 +397,7 @@ void PlaySilentMIDI (int mnum) {
         quitprintf("!PlaySilentMIDI: failed to load aMusic%d", mnum);
     }
     channels[play.SilentMidiChannel]->play();
-    channels[play.silent_midi_channel]->set_volume_origin(0);
+    channels[play.SilentMidiChannel]->set_volume_origin(0);
 }
 
 void SetSpeechVolume(int newvol) {

@@ -188,7 +188,7 @@ void SetSkipSpeech (SkipSpeechStyle newval) {
         quit("!SetSkipSpeech: invalid skip mode specified");
 
     DEBUG_CONSOLE("SkipSpeech style set to %d", newval);
-    play.cant_skip_speech = user_to_internal_skip_speech((SkipSpeechStyle)newval);
+    play.SkipSpeechMode = user_to_internal_skip_speech((SkipSpeechStyle)newval);
 }
 
 SkipSpeechStyle GetSkipSpeech()

@@ -1426,12 +1426,12 @@ SavedGameError do_after_restore(SavedGameRestorationData &restore_data)
     int queuedMusicSize = play.MusicQueueLength;
     play.MusicQueueLength = 0;
 
-    update_polled_stuff_if_runtime();
+    update_polled_audio_and_crossfade();
 
     if (displayed_room >= 0)
         load_new_room(displayed_room,NULL);//&game.Characters[game.PlayerCharacterIndex]);
 
-    update_polled_stuff_if_runtime();
+    update_polled_audio_and_crossfade();
 
     play.GlobalScriptTimer=gstimer;
 
@@ -1452,7 +1452,7 @@ SavedGameError do_after_restore(SavedGameRestorationData &restore_data)
     set_window_title(play.GameName);
 #endif
 
-    update_polled_stuff_if_runtime();
+    update_polled_audio_and_crossfade();
 
     if (displayed_room >= 0) {
 
@@ -1522,7 +1522,7 @@ SavedGameError do_after_restore(SavedGameRestorationData &restore_data)
     guis_need_update = 1;
 
     play.IgnoreUserInputUntilTime = 0;
-    update_polled_stuff_if_runtime();
+    update_polled_audio_and_crossfade();
 
     platform->RunPluginHooks(AGSE_POSTRESTOREGAME, 0);
 

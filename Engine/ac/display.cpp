@@ -175,7 +175,7 @@ int _display_main(int xx,int yy,int wii,char*todis,int blocking,int usingfont,in
             draw_text_window_and_bar(&text_window_ds, wantFreeScreenop, &ttxleft, &ttxtop, &xx, &yy, &wii, &text_color, 0, usingGui);
             if (usingGui > 0)
             {
-                alphaChannel = guis[usingGui].is_alpha();
+                alphaChannel = guis[usingGui].HasAlphaChannel();
             }
         }
         else if ((ShouldAntiAliasText()) && (final_col_dep >= 24))
@@ -248,7 +248,7 @@ int _display_main(int xx,int yy,int wii,char*todis,int blocking,int usingfont,in
         // 3 = only on keypress, no auto timer
         // 4 = mouse only
         int countdown = GetTextDisplayTime (todis);
-        int skip_setting = user_to_internal_skip_speech((SkipSpeechStyle)play.skip_display);
+        int skip_setting = user_to_internal_skip_speech((SkipSpeechStyle)play.SkipDisplayMethod);
         while (1) {
             timerloop = 0;
             NEXT_ITERATION();
@@ -551,7 +551,7 @@ void draw_button_background(Bitmap *ds, int xx1,int yy1,int xx2,int yy2,GuiMain*
                     bgoffsy = bgoffsyStart;
                     while (bgoffsy <= bgfinishy)
                     {
-                        draw_gui_sprite_v330(ds, iep->bgpic, bgoffsx, bgoffsy);
+                        draw_gui_sprite_v330(ds, iep->BackgroundImage, bgoffsx, bgoffsy);
                         bgoffsy += spriteheight[iep->BackgroundImage];
                     }
                     bgoffsx += spritewidth[iep->BackgroundImage];

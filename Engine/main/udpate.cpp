@@ -245,7 +245,7 @@ void update_speech_and_messages()
   if (play.MessageTime>=0) {
     play.MessageTime--;
     // extend life of text if the voice hasn't finished yet
-    if (is_voice && !play.speech_in_post_state) {
+    if (is_voice && !play.SpeechInPostState) {
       if ((!rec_isSpeechFinished()) && (play.FastForwardCutscene == 0)) {
       //if ((!channels[SCHAN_SPEECH]->done) && (play.FastForwardCutscene == 0)) {
         if (play.MessageTime <= 1)
@@ -255,17 +255,17 @@ void update_speech_and_messages()
         play.MessageTime = 0;
     }
 
-    if (play.messagetime < 1 && play.speech_display_post_time_ms > 0 &&
-        play.fast_forward == 0)
+    if (play.MessageTime < 1 && play.SpeechDisplayPostTimeMs > 0 &&
+        play.FastForwardCutscene == 0)
     {
-        if (!play.speech_in_post_state)
+        if (!play.SpeechInPostState)
         {
-            play.messagetime = play.speech_display_post_time_ms * frames_per_second / 1000;
+            play.MessageTime = play.SpeechDisplayPostTimeMs * frames_per_second / 1000;
         }
-        play.speech_in_post_state = !play.speech_in_post_state;
+        play.SpeechInPostState = !play.SpeechInPostState;
     }
 
-    if (play.messagetime < 1) 
+    if (play.MessageTime < 1) 
     {
       if (play.FastForwardCutscene > 0)
       {
@@ -343,19 +343,19 @@ void update_sierra_speech()
     }
     else if (facetalkwait>0) facetalkwait--;
     // don't animate if the speech has finished
-    else if ((play.messagetime < 1) && (facetalkframe == 0) &&
-             // if play.close_mouth_speech_time = 0, this means animation should play till
+    else if ((play.MessageTime < 1) && (facetalkframe == 0) &&
+             // if play.CloseMouthSpeechTime = 0, this means animation should play till
              // the speech ends; but this should not work in voice mode, and also if the
              // speech is in the "post" state
-             (is_voice || play.speech_in_post_state || play.close_mouth_speech_time > 0))
+             (is_voice || play.SpeechInPostState || play.CloseMouthSpeechTime > 0))
       ;
     else {
       // Close mouth at end of sentence: if speech has entered the "post" state,
       // or if this is a text only mode and close_mouth_speech_time is set
-      if (play.speech_in_post_state ||
+      if (play.SpeechInPostState ||
           !is_voice &&
-          (play.messagetime < play.close_mouth_speech_time) &&
-          (play.close_mouth_speech_time > 0)) {
+          (play.MessageTime < play.CloseMouthSpeechTime) &&
+          (play.CloseMouthSpeechTime > 0)) {
         facetalkframe = 0;
         facetalkwait = play.MessageTime;
       }
@@ -370,7 +370,7 @@ void update_sierra_speech()
         // normal non-lip-sync
         facetalkframe++;
         if ((facetalkframe >= views[facetalkview].loops[facetalkloop].numFrames) ||
-            (!is_voice && (play.messagetime < 1) && (play.close_mouth_speech_time > 0))) {
+            (!is_voice && (play.MessageTime < 1) && (play.CloseMouthSpeechTime > 0))) {
 
           if ((facetalkframe >= views[facetalkview].loops[facetalkloop].numFrames) &&
               (views[facetalkview].loops[facetalkloop].RunNextLoop())) 
@@ -434,7 +434,7 @@ void update_sierra_speech()
             vf,
             view_frame_x, view_frame_y);
       }
-      const bool closeupface_has_alpha = (game.spriteflags[vf->pic] & SPF_ALPHACHANNEL) != 0;
+      const bool closeupface_has_alpha = (game.SpriteFlags[vf->pic] & SPF_ALPHACHANNEL) != 0;
 
       gfxDriver->UpdateDDBFromBitmap(screenover[face_talking].bmp, screenover[face_talking].pic, closeupface_has_alpha);
     }  // end if updatedFrame

@@ -107,7 +107,7 @@ void move_track_to_crossfade_channel(int currentChannel, int crossfadeSpeed, int
 
     play.CrossfadingOutChannel = SPECIAL_CROSSFADE_CHANNEL;
     play.CrossfadeStep = 0;
-    play.crossfade_initial_volume_out = channels[SPECIAL_CROSSFADE_CHANNEL]->get_volume();
+    play.CrossfadeInitialVolumeOut = channels[SPECIAL_CROSSFADE_CHANNEL]->get_volume();
     play.CrossfadeOutVolumePerStep = crossfadeSpeed;
 
     play.CrossfadingInChannel = fadeInChannel;
@@ -275,7 +275,7 @@ void audio_update_polled_stuff()
         if (channels[play.CrossfadingOutChannel] == NULL)
             quitprintf("Crossfade out channel is %d but channel has gone", play.CrossfadingOutChannel);
 
-        int newVolume = channels[play.crossfading_out_channel]->get_volume() - play.crossfade_out_volume_per_step;
+        int newVolume = channels[play.CrossfadingOutChannel]->get_volume() - play.CrossfadeOutVolumePerStep;
         if (newVolume > 0)
         {
             AudioChannel_SetVolume(&scrAudioChannel[play.CrossfadingOutChannel], newVolume);
@@ -289,7 +289,7 @@ void audio_update_polled_stuff()
 
     if (play.CrossfadingInChannel > 0)
     {
-        int newVolume = channels[play.crossfading_in_channel]->get_volume() + play.crossfade_in_volume_per_step;
+        int newVolume = channels[play.CrossfadingInChannel]->get_volume() + play.CrossfadeInVolumePerStep;
         if (newVolume > play.CrossfadeFinalVolumeIn)
         {
             newVolume = play.CrossfadeFinalVolumeIn;
@@ -380,7 +380,7 @@ ScriptAudioChannel* play_audio_clip_on_channel(int channel, ScriptAudioClip *cli
         // disable the clip under condition that there's more than one
         // channel for this audio type? It does not even check if
         // anything of this type is currently playing.
-        if (game.audioClipTypes[clip->type].reservedChannels != 1)
+        if (game.AudioClipTypes[clip->type].reservedChannels != 1)
             soundfx->originalVolAsPercentage = 0;
     }
 
@@ -823,7 +823,7 @@ void play_next_queued() {
 
 int calculate_max_volume() {
     // quieter so that sounds can be heard better
-    int newvol=play.music_master_volume + ((int)thisroom.options[ST_VOLUME]) * LegacyRoomVolumeFactor;
+    int newvol=play.MusicMasterVolume + ((int)thisroom.Options[kRoomBaseOpt_MusicVolume]) * LegacyRoomVolumeFactor;
     if (newvol>255) newvol=255;
     if (newvol<0) newvol=0;
 
@@ -843,7 +843,7 @@ void apply_volume_drop_modifier(bool applyModifier)
             if (applyModifier)
             {
                 int audioType = ((ScriptAudioClip*)channels[i]->sourceClip)->type;
-                channels[i]->apply_volume_modifier(-(game.audioClipTypes[audioType].volume_reduction_while_speech_playing * 255 / 100));
+                channels[i]->apply_volume_modifier(-(game.AudioClipTypes[audioType].volume_reduction_while_speech_playing * 255 / 100));
             }
             else
                 channels[i]->apply_volume_modifier(0);

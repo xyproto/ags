@@ -80,7 +80,7 @@ int Object_GetTransparency(ScriptObject *objj) {
     if (!is_valid_object(objj->id))
         quit("!Object.Transparent: invalid object number specified");
 
-    return GfxUtil::LegacyTrans255ToTrans100(objs[objj->id].transparent);
+    return GfxUtil::LegacyTrans255ToTrans100(objs[objj->id].Transparency);
 }
 
 void Object_SetBaseline(ScriptObject *objj, int basel) {

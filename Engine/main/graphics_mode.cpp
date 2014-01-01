@@ -279,7 +279,7 @@ int initialize_graphics_filter(const char *filterID, int width, int height, int 
     int idx = 0;
     GFXFilter **filterList;
 
-    if (usetup.gfxDriverID.CompareNoCase("D3D9") == 0)
+    if (usetup.GfxDriverID.CompareNoCase("D3D9") == 0)
     {
         filterList = get_d3d_gfx_filter_list(false);
     }
@@ -320,7 +320,7 @@ int initialize_graphics_filter(const char *filterID, int width, int height, int 
 void pre_create_gfx_driver(const String &gfx_driver_id)
 {
 #ifdef WINDOWS_VERSION
-    if (gfx_driver_id.CompareNoCase("D3D9") == 0 && (game.color_depth != 1))
+    if (gfx_driver_id.CompareNoCase("D3D9") == 0 && (game.ColorDepth != 1))
     {
         gfxDriver = GetD3DGraphicsDriver(NULL);
         if (!gfxDriver)
@@ -331,7 +331,7 @@ void pre_create_gfx_driver(const String &gfx_driver_id)
     else
 #endif
 #if defined (IOS_VERSION) || defined(ANDROID_VERSION) || defined(WINDOWS_VERSION)
-    if (gfx_driver_id.CompareNoCase("DX5") != 0 && (psp_gfx_renderer > 0) && (game.color_depth != 1))
+    if (gfx_driver_id.CompareNoCase("DX5") != 0 && (psp_gfx_renderer > 0) && (game.ColorDepth != 1))
     {
         gfxDriver = GetOGLGraphicsDriver(NULL);
         if (!gfxDriver)
@@ -465,7 +465,7 @@ int get_maximal_supported_scaling(const Size &game_size)
     // max scaling for siderborders mode
     int desktop_width;
     int desktop_height;
-    if (usetup.enable_side_borders != 0 &&
+    if (usetup.EnableSideBorders != 0 &&
         get_desktop_resolution(&desktop_width, &desktop_height) == 0)
     {
         const int desktop_ratio = (desktop_height << 10) / desktop_width;
@@ -493,11 +493,11 @@ String get_maximal_supported_scaling_filter()
     const int max_scaling = 8; // we support up to x8 scaling now
 
     // fullscreen mode
-    if (usetup.windowed == 0)
+    if (usetup.Windowed == 0)
     {
         int selected_scaling = 0;
         // max scaling for normal mode
-        if (game.options[OPT_LETTERBOX] == 0)
+        if (game.Options[OPT_LETTERBOX] == 0)
         {
             selected_scaling = get_maximal_supported_scaling(Size(game_width, game_height));
         }
@@ -544,8 +544,8 @@ int engine_init_gfx_filters()
     if (force_gfxfilter[0]) {
         gfxfilter = force_gfxfilter;
     }
-    else if (!usetup.gfxFilterID.IsEmpty() && stricmp(usetup.gfxFilterID, "max") != 0) {
-        gfxfilter = usetup.gfxFilterID;
+    else if (!usetup.GfxFilterID.IsEmpty() && stricmp(usetup.GfxFilterID, "max") != 0) {
+        gfxfilter = usetup.GfxFilterID;
     }
 #if defined (WINDOWS_VERSION) || defined (LINUX_VERSION)
     else {
@@ -564,7 +564,7 @@ void create_gfx_driver(const String &gfx_driver_id)
 {
     Out::FPrint("Init gfx driver");
     pre_create_gfx_driver(gfx_driver_id);
-    usetup.gfxDriverID = gfxDriver->GetDriverID();
+    usetup.GfxDriverID = gfxDriver->GetDriverID();
 
     gfxDriver->SetCallbackOnInit(GfxDriverOnInitCallback);
     gfxDriver->SetTintMethod(TintReColourise);
@@ -707,7 +707,7 @@ int engine_init_graphics_mode()
 
     if (switch_to_graphics_mode(initasx, initasy, scrnwid, scrnhit, firstDepth, secondDepth))
     {
-        if ((usetup.gfxFilterID.IsEmpty() || 
+        if ((usetup.GfxFilterID.IsEmpty() || 
             (stricmp(usetup.GfxFilterID, "none") == 0)) &&
             (scrnwid == 320))
         {
@@ -897,7 +897,7 @@ void display_gfx_mode_error()
     platform->FinishedUsingGraphicsMode();
 
     // make sure the error message displays the true resolution
-    if (game.options[OPT_LETTERBOX])
+    if (game.Options[OPT_LETTERBOX])
         initasy = (initasy * 12) / 10;
 
     if (filter != NULL)
@@ -917,15 +917,15 @@ int graphics_mode_init()
 {
     // Engine may try to change from windowed to fullscreen if the first failed;
     // here we keep the original windowed flag in case we'll have to restore it
-    int windowed = usetup.windowed;
+    int windowed = usetup.Windowed;
 
-    int res = create_gfx_driver_and_init_mode(usetup.gfxDriverID);
+    int res = create_gfx_driver_and_init_mode(usetup.GfxDriverID);
     if (res != RETURN_CONTINUE)
     {
         if (gfxDriver && stricmp(gfxDriver->GetDriverID(), "DX5") != 0)
         {
             graphics_mode_shutdown();
-            usetup.windowed = windowed;
+            usetup.Windowed = windowed;
             res = create_gfx_driver_and_init_mode("DX5");
         }
     }
@@ -937,7 +937,7 @@ int graphics_mode_init()
 
     engine_post_init_gfx_driver();
     engine_prepare_screen();
-    platform->PostAllegroInit((usetup.windowed > 0) ? true : false);
+    platform->PostAllegroInit((usetup.Windowed > 0) ? true : false);
     engine_set_gfx_driver_callbacks();
     engine_set_color_conversions();
     return RETURN_CONTINUE;

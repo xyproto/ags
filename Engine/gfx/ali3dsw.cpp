@@ -572,7 +572,7 @@ void ALSoftwareGraphicsDriver::RenderToBackBuffer()
     else
     {
       // here _transparency is used as alpha (between 1 and 254), but 0 means opaque!
-      GfxUtil::DrawSpriteWithTransparency(virtualScreen, bitmap->_bmp, drawAtX, drawAtY,
+      GfxUtil::DrawSpriteWithTransparency(virtualScreen, &bitmap->_bmp, drawAtX, drawAtY,
           bitmap->_transparency ? bitmap->_transparency : 255);
     }
   }

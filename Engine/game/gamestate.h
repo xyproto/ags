@@ -110,7 +110,7 @@ public:
     int32_t     NarratorCharacterIndex;
     int32_t     AmbientSoundsPersist;       // do not stop ambient sounds on room change
     int32_t     LipsyncSpeed;
-    int32_t     CloseMouthSpeechTime;       // stop speech animation at (messagetime - close_mouth_speech_time)
+    int32_t     CloseMouthSpeechTime;       // stop speech animation at (Messagetime - CloseMouthSpeechTime)
                                             // (this is designed to work in text-only mode)
     int32_t     DisableAntiAliasing;
     int32_t     TextSpeedModifier;

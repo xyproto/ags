@@ -47,14 +47,14 @@ extern void replace_macro_tokens(const char *text, String &fixed_text);
 
 extern SpriteCache spriteset; // in ac_runningame
 
-bool GUIMain::is_alpha() 
+bool AGS::Common::GuiMain::HasAlphaChannel() const
 {
-    if (this->bgpic > 0)
+    if (this->BackgroundImage > 0)
     {
         // alpha state depends on background image
-        return is_sprite_alpha(this->bgpic);
+        return is_sprite_alpha(this->BackgroundImage);
     }
-    if (this->bgcol > 0)
+    if (this->BackgroundColor > 0)
     {
         // not alpha transparent if there is a background color
         return false;
@@ -64,7 +64,7 @@ bool GUIMain::is_alpha()
         // transparent background have alpha channel only since 3.2.0;
         // "classic" gui rendering mode historically had non-alpha transparent backgrounds
         // (3.2.0 broke the compatibility, now we restore it)
-        loaded_game_file_version >= kGameVersion_320 && game.options[OPT_NEWGUIALPHA] != kGuiAlphaRender_Classic;
+        loaded_game_file_version >= kGameVersion_320 && game.Options[OPT_NEWGUIALPHA] != kGuiAlphaRender_Classic;
 }
 
 //=============================================================================

@@ -817,7 +817,7 @@ void draw_sprite_support_alpha(Bitmap *ds, bool ds_has_alpha, int xpos, int ypos
     }
 
     const bool use_new_sprite_alpha_blending =
-        (game.options[OPT_SPRITEALPHA] == kSpriteAlphaRender_Improved) && ds_has_alpha;
+        (game.Options[OPT_SPRITEALPHA] == kSpriteAlphaRender_Improved) && ds_has_alpha;
 
     if (src_has_alpha &&
         (use_new_sprite_alpha_blending || alpha == 0xFF))
@@ -836,7 +836,7 @@ void draw_sprite_support_alpha(Bitmap *ds, bool ds_has_alpha, int xpos, int ypos
 
 void draw_sprite_slot_support_alpha(Bitmap *ds, bool ds_has_alpha, int xpos, int ypos, int src_slot, int alpha)
 {
-    draw_sprite_support_alpha(ds, ds_has_alpha, xpos, ypos, spriteset[src_slot], (game.spriteflags[src_slot] & SPF_ALPHACHANNEL) != 0, alpha);
+    draw_sprite_support_alpha(ds, ds_has_alpha, xpos, ypos, spriteset[src_slot], (game.SpriteFlags[src_slot] & SPF_ALPHACHANNEL) != 0, alpha);
 }
 
 
@@ -1102,12 +1102,12 @@ void repair_alpha_channel(Bitmap *dest, Bitmap *bgpic)
 void draw_gui_sprite(Bitmap *ds, int picc, int xx, int yy, bool use_alpha) 
 {
     if ((use_alpha) && 
-        (game.options[OPT_NEWGUIALPHA] != kGuiAlphaRender_Classic) &&
+        (game.Options[OPT_NEWGUIALPHA] != kGuiAlphaRender_Classic) &&
         (ds->GetColorDepth() == 32))
     {
         if (game.SpriteFlags[picc] & SPF_ALPHACHANNEL)
         {
-            if (game.options[OPT_NEWGUIALPHA] == kGuiAlphaRender_MultiplyTranslucenceSrcBlend)
+            if (game.Options[OPT_NEWGUIALPHA] == kGuiAlphaRender_MultiplyTranslucenceSrcBlend)
             {
                 set_argb2argb_alpha_blender();
             }
@@ -2210,7 +2210,7 @@ void draw_screen_overlay() {
                 {
                     isAlpha = true;
 
-                    if ((game.options[OPT_NEWGUIALPHA] == kGuiAlphaRender_Classic) && (guis[aa].bgpic > 0))
+                    if ((game.Options[OPT_NEWGUIALPHA] == kGuiAlphaRender_Classic) && (guis[aa].BackgroundImage > 0))
                     {
                         // old-style (pre-3.0.2) GUI alpha rendering
                         repair_alpha_channel(guibg[aa], spriteset[guis[aa].BackgroundImage]);

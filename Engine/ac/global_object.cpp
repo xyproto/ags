@@ -167,7 +167,7 @@ void SetObjectTransparency(int obn,int trans) {
     if (!is_valid_object(obn)) quit("!SetObjectTransparent: invalid object number specified");
     if ((trans < 0) || (trans > 100)) quit("!SetObjectTransparent: transparency value must be between 0 and 100");
 
-    objs[obn].transparent = GfxUtil::Trans100ToLegacyTrans255(trans);
+    objs[obn].Transparency = GfxUtil::Trans100ToLegacyTrans255(trans);
 }
 
 
@@ -247,7 +247,7 @@ void MergeObject(int obn) {
     int xpos = multiply_up_coordinate(objs[obn].X);
     int ypos = (multiply_up_coordinate(objs[obn].Y) - theHeight);
 
-    draw_sprite_support_alpha(bg_frame, false, xpos, ypos, actsps[obn], (game.spriteflags[objs[obn].num] & SPF_ALPHACHANNEL) != 0);
+    draw_sprite_support_alpha(bg_frame, false, xpos, ypos, ObjActiveSprites[obn].Bmp, (game.SpriteFlags[objs[obn].SpriteIndex] & SPF_ALPHACHANNEL) != 0);
     invalidate_screen();
     mark_current_background_dirty();
 

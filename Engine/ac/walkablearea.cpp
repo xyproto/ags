@@ -73,16 +73,16 @@ int get_area_scaling (int onarea, int xx, int yy) {
             // Work it all out without having to use floats
             // Percent = ((y - top) * 100) / (areabottom - areatop)
             // Zoom level = ((max - min) * Percent) / 100
-            if (thisroom.walk_area_bottom[onarea] != thisroom.walk_area_top[onarea])
+            if (thisroom.WalkAreas[onarea].Bottom != thisroom.WalkAreas[onarea].Top)
             {
-                int percent = ((yy - thisroom.walk_area_top[onarea]) * 100)
-                    / (thisroom.walk_area_bottom[onarea] - thisroom.walk_area_top[onarea]);
-                zoom_level = ((thisroom.walk_area_zoom2[onarea] - thisroom.walk_area_zoom[onarea]) * (percent)) / 100 + thisroom.walk_area_zoom[onarea];
+                int percent = ((yy - thisroom.WalkAreas[onarea].Top) * 100)
+                    / (thisroom.WalkAreas[onarea].Bottom - thisroom.WalkAreas[onarea].Top);
+                zoom_level = ((thisroom.WalkAreas[onarea].Zoom2 - thisroom.WalkAreas[onarea].Zoom) * (percent)) / 100 + thisroom.WalkAreas[onarea].Zoom;
             }
             else
             {
                 // Special case for 1px tall walkable area: take bottom line scaling
-                zoom_level = thisroom.walk_area_zoom2[onarea];
+                zoom_level = thisroom.WalkAreas[onarea].Zoom2;
             }
             zoom_level += 100;
     }

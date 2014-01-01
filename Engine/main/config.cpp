@@ -247,7 +247,7 @@ void read_config_file(char *argv0) {
         int no_speech = INIreadint ("sound", "usespeech", 0) != 0;
         usetup.NoSpeechPack = no_speech == 0;
 
-        usetup.data_files_dir = INIreadstring("misc","datadir");
+        usetup.DataFilesDir = INIreadstring("misc","datadir");
         if (usetup.DataFilesDir.IsEmpty())
             usetup.DataFilesDir = ".";
         // strip any trailing slash
@@ -262,21 +262,17 @@ void read_config_file(char *argv0) {
 #else
         usetup.DataFilesDir.TrimRight('/');
 #endif
-        usetup.main_data_filename = INIreadstring ("misc", "datafile");
+        usetup.MainDataFilename = INIreadstring ("misc", "datafile");
 
 #if defined(IOS_VERSION) || defined(PSP_VERSION) || defined(ANDROID_VERSION)
         // PSP: No graphic filters are available.
         usetup.GfxFilterID.Empty();
 #else
-        usetup.gfxFilterID = INIreadstring("misc", "gfxfilter");
-        usetup.GfxFilterID = gfx_filter;
-        free(gfx_filter);
+        usetup.GfxFilterID = INIreadstring("misc", "gfxfilter");
 #endif
 
 #if defined (WINDOWS_VERSION)
-        usetup.gfxDriverID = INIreadstring("misc", "gfxdriver");
-        usetup.GfxDriverID = gfx_driver;
-        free(gfx_driver);
+        usetup.GfxDriverID = INIreadstring("misc", "gfxdriver");
 #else
         usetup.GfxDriverID = "DX5";
 #endif
@@ -301,24 +297,24 @@ void read_config_file(char *argv0) {
         else
             play.IsPlayback = 0;
 
-        usetup.override_multitasking = INIreadint("override", "multitasking");
+        usetup.OverrideMultitasking = INIreadint("override", "multitasking");
         String override_os = INIreadstring("override", "os");
-        usetup.override_script_os = -1;
+        usetup.OverrideScriptOs = -1;
         if (override_os.CompareNoCase("dos") == 0)
         {
-            usetup.override_script_os = eOS_DOS;
+            usetup.OverrideScriptOs = eOS_DOS;
         }
         else if (override_os.CompareNoCase("win") == 0)
         {
-            usetup.override_script_os = eOS_Win;
+            usetup.OverrideScriptOs = eOS_Win;
         }
         else if (override_os.CompareNoCase("linux") == 0)
         {
-            usetup.override_script_os = eOS_Linux;
+            usetup.OverrideScriptOs = eOS_Linux;
         }
         else if (override_os.CompareNoCase("mac") == 0)
         {
-            usetup.override_script_os = eOS_Mac;
+            usetup.OverrideScriptOs = eOS_Mac;
         }
 
         // NOTE: at the moment AGS provide little means to determine whether an

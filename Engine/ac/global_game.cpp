@@ -459,7 +459,7 @@ void EndSkippingUntilCharStops() {
 void StartCutscene (int skipwith) {
     static ScriptPosition last_cutscene_script_pos;
 
-    if (play.in_cutscene) {
+    if (play.IsInCutscene) {
         quitprintf("!StartCutscene: already in a cutscene; previous started in \"%s\", line %d",
             last_cutscene_script_pos.Section.GetCStr(), last_cutscene_script_pos.Line);
     }
@@ -749,9 +749,9 @@ void SetMultitasking (int mode) {
     if ((mode < 0) | (mode > 1))
         quit("!SetMultitasking: invalid mode parameter");
 
-    if (usetup.override_multitasking >= 0)
+    if (usetup.OverrideMultitasking >= 0)
     {
-        mode = usetup.override_multitasking;
+        mode = usetup.OverrideMultitasking;
     }
 
     // Don't allow background running if full screen

@@ -1024,15 +1024,15 @@ void init_game_settings() {
     play.PlayerScore=0;
     play.SierraInventoryBkgColour=7;
     // copy the value set by the editor
-    if (game.options[OPT_GLOBALTALKANIMSPD] >= 0)
+    if (game.Options[OPT_GLOBALTALKANIMSPD] >= 0)
     {
-        play.talkanim_speed = game.options[OPT_GLOBALTALKANIMSPD];
-        game.options[OPT_GLOBALTALKANIMSPD] = 1;
+        play.SpeechAnimSpeed = game.Options[OPT_GLOBALTALKANIMSPD];
+        game.Options[OPT_GLOBALTALKANIMSPD] = 1;
     }
     else
     {
-        play.talkanim_speed = -game.options[OPT_GLOBALTALKANIMSPD] - 1;
-        game.options[OPT_GLOBALTALKANIMSPD] = 0;
+        play.SpeechAnimSpeed = -game.Options[OPT_GLOBALTALKANIMSPD] - 1;
+        game.Options[OPT_GLOBALTALKANIMSPD] = 0;
     }
     play.InvItemWidth = 40;
     play.InvItemHeight = 22;
@@ -1083,10 +1083,10 @@ void init_game_settings() {
     play.CurrentMusicIndex=-1;
     play.MusicLoopMode=1;
     play.MusicMasterVolume=160;
-    play.music_master_volume=100 + LegacyMusicMasterVolumeAdjustment;
+    play.MusicMasterVolume=100 + LegacyMusicMasterVolumeAdjustment;
     play.ScreenFlipped=0;
     play.ViewportLocked=0;
-    play.cant_skip_speech = user_to_internal_skip_speech((SkipSpeechStyle)game.options[OPT_NOSKIPTEXT]);
+    play.SkipSpeechMode = user_to_internal_skip_speech((SkipSpeechStyle)game.Options[OPT_NOSKIPTEXT]);
     play.SoundVolume = 255;
     play.SpeechVolume = 255;
     play.NormalFont = 0;
@@ -1139,11 +1139,11 @@ void init_game_settings() {
     play.ShowSingleDialogOption = 0;
     play.KeepScreenDuringInstantTransition = 0;
     play.DialogOptionReadColour = -1;
-    play.speech_portrait_placement = 0;
-    play.speech_portrait_x = 0;
-    play.speech_portrait_y = 0;
-    play.speech_display_post_time_ms = 0;
-    play.speech_in_post_state = false;
+    play.SpeechPortraitPlacement = 0;
+    play.SpeechPortraitX = 0;
+    play.SpeechPortraitY = 0;
+    play.SpeechDisplayPostTimeMs = 0;
+    play.SpeechInPostState = false;
     play.NarratorCharacterIndex = game.PlayerCharacterIndex;
     play.CrossfadingOutChannel = 0;
     play.SpeechTextWindowGuiIndex = game.Options[OPT_TWCUSTOM];
@@ -1181,7 +1181,7 @@ void init_game_settings() {
         last_sound_played[ee] = -1;
 
     if (!usetup.Translation.IsEmpty())
-        init_translation (usetup.translation, "", true);
+        init_translation (usetup.Translation, "", true);
 
     update_invorder();
     displayed_room = -10;
@@ -1205,9 +1205,9 @@ void engine_init_game_shit()
     scsystem.viewport_height = divide_down_coordinate(scrnhit);
     // ScriptSystem::aci_version is only 10 chars long
     strncpy(scsystem.aci_version, EngineVersion.LongString, 10);
-    if (usetup.override_script_os >= 0)
+    if (usetup.OverrideScriptOs >= 0)
     {
-        scsystem.os = usetup.override_script_os;
+        scsystem.os = usetup.OverrideScriptOs;
     }
     else
     {
