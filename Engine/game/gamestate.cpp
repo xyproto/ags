@@ -111,6 +111,7 @@ void GameState::ReadFromFile_v321(Stream *in)
     SpeechPortraitPlacement = in->ReadInt32();
     SpeechPortraitX = in->ReadInt32();
     SpeechPortraitY = in->ReadInt32();
+    SpeechDisplayPostTimeMs = in->ReadInt32();
     in->ReadArrayOfInt32(Reserved, GAME_STATE_RESERVED_INTS);
     // ** up to here is referenced in the script "game." object
     IsRecording = in->ReadInt32();   // user is recording their moves
@@ -293,6 +294,7 @@ void GameState::WriteToFile_v321(Stream *out)
     out->WriteInt32(SpeechPortraitPlacement);
     out->WriteInt32(SpeechPortraitX);
     out->WriteInt32(SpeechPortraitY);
+    out->WriteInt32(SpeechDisplayPostTimeMs);
     out->WriteArrayOfInt32(Reserved, GAME_STATE_RESERVED_INTS);
     // ** up to here is referenced in the script "game." object
     out->WriteInt32(IsRecording);   // user is recording their moves

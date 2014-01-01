@@ -57,6 +57,8 @@ public:
     String  Translation;
     String  GfxFilterID;
     String  GfxDriverID;
+    int32_t OverrideScriptOs;
+    int32_t OverrideMultitasking;
 };
 
 } // namespace Engine

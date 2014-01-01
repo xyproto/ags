@@ -37,7 +37,7 @@ using Common::ObjectArray;
 using Common::Stream;
 using Common::String;
 
-#define GAME_STATE_RESERVED_INTS 7
+#define GAME_STATE_RESERVED_INTS 6
 
 class GameState
 {
@@ -110,7 +110,8 @@ public:
     int32_t     NarratorCharacterIndex;
     int32_t     AmbientSoundsPersist;       // do not stop ambient sounds on room change
     int32_t     LipsyncSpeed;
-    int32_t     CloseMouthSpeechTime;       // ????
+    int32_t     CloseMouthSpeechTime;       // stop speech animation at (messagetime - close_mouth_speech_time)
+                                            // (this is designed to work in text-only mode)
     int32_t     DisableAntiAliasing;
     int32_t     TextSpeedModifier;
     int32_t     DisplayTextAlignment;
@@ -140,7 +141,9 @@ public:
     int32_t     StopDialogAtEnd;            // ????
     int32_t     SpeechPortraitPlacement;    // speech portrait placement mode (automatic/custom)
     int32_t     SpeechPortraitX;            // a speech portrait x offset from corresponding screen side
-    int32_t     SpeechPortraitY;            // a speech portrait y offset 
+    int32_t     SpeechPortraitY;            // a speech portrait y offset
+    int32_t     SpeechDisplayPostTimeMs;    // keep speech text/portrait on screen after text/voice has finished playing;
+                                            // no speech animation is supposed to be played at this time
     int32_t     Reserved[GAME_STATE_RESERVED_INTS];
     // ** up to here is referenced in the script "game." object
     //-----------------------------------------------------
@@ -240,6 +243,9 @@ public:
     int32_t     DisplayTextIgnoreUserInputDelayMs;
     uint32_t    IgnoreUserInputUntilTime;
     Array<int32_t> DefaultAudioTypeVolumes; //[MAX_AUDIO_TYPES];
+
+    // These variables are not serialized
+    bool        SpeechInPostState;
 };
 
 } // namespace Engine
