@@ -295,14 +295,14 @@ void quit(const char *quitmsg) {
 
     our_eip = 9908;
 
+    thisroom.Free();
+    CharActiveSprites.Free();
+    ObjActiveSprites.Free();
+
     graphics_mode_shutdown();
 
     quit_message_on_exit(qmsg, alertis);
 
-    // This MUST be called before Allegro is deinitialized.
-    thisroom.Free();
-    CharActiveSprites.Free();
-    ObjActiveSprites.Free();
     // remove the game window
     allegro_exit();
 

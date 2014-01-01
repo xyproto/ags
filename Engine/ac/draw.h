@@ -122,7 +122,7 @@ extern AGS::Common::Bitmap **guibg;
 extern AGS::Engine::IDriverDependantBitmap **guibgbmp;
 
 //---------------------------------------------------------
-// ActiveSprite is used for temporary storage of the bitamp image
+// ActiveSprite is used for temporary storage of the bitmap image
 // of the latest version of the sprite
 struct ActiveSprite
 {
