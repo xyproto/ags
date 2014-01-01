@@ -111,15 +111,6 @@ void ConvertFileNameToCharArray(System::String^ clrString, char *textBuffer)
   }
 }
 
-void ConvertStringToNativeString(System::String^ clrString, AGS::Common::String &destStr)
-{
-    char* stringPointer = (char*)Marshal::StringToHGlobalAnsi(clrString).ToPointer();
-
-    destStr = stringPointer;
-
-    Marshal::FreeHGlobal(IntPtr(stringPointer));
-}
-
 void ConvertStringToCharArray(System::String^ clrString, char *textBuffer, int maxLength)
 {
 	if (clrString->Length >= maxLength) 

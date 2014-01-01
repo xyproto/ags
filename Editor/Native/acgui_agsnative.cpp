@@ -13,14 +13,14 @@
 #include "gui/guitextbox.h"
 #include "util/string_utils.h"
 
-bool GUIMain::is_alpha() 
+bool AGS::Common::GuiMain::HasAlphaChannel() const
 {
-    if (this->bgpic > 0)
+    if (this->BackgroundImage > 0)
     {
         // alpha state depends on background image
-        return is_sprite_alpha(this->bgpic);
+        return is_sprite_alpha(this->BackgroundImage);
     }
-    if (this->bgcol > 0)
+    if (this->BackgroundColor > 0)
     {
         // not alpha transparent if there is a background color
         return false;

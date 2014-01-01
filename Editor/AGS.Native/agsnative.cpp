@@ -1558,9 +1558,8 @@ void allocate_memory_for_views(int viewCount)
 
 void ReadGameSetupStructBase_Aligned(Stream *in)
 {
-    GameSetupStructBase *gameBase = (GameSetupStructBase *)&thisgame;
     AlignedStream align_s(in, Common::kAligned_Read);
-    gameBase->ReadFromFile(&align_s);
+    thisgame.ReadBaseFromFile(&align_s);
 }
 
 const char *load_dta_file_into_thisgame(const char *fileName)
@@ -1629,7 +1628,7 @@ const char *load_dta_file_into_thisgame(const char *fileName)
   iii->ReadArray (&thisgame.LipSyncFrameLetters[0][0], 20, 50);
 
   for (bb=0;bb<MAXGLOBALMES;bb++) {
-    if (!thisgame.MessageToLoad[bb]) continue;
+    if (!thisgame.LoadMessages[bb]) continue;
     read_string_decrypt(iii, thisgame.GlobalMessages[bb]);
   }
 
@@ -4242,7 +4241,7 @@ Game^ load_old_game_dta_file(const char *fileName)
 		newGui->BackgroundColor = guis[i].BackgroundColor;
 		newGui->BackgroundImage = guis[i].BackgroundImage;
 		newGui->ID = i;
-		newGui->Name = gcnew String(guis[i].name);
+		newGui->Name = gcnew String(guis[i].Name);
 
 		for (int j = 0; j < guis[i].ControlCount; j++)
 		{
@@ -4441,7 +4440,7 @@ AGS::Types::Room^ load_crm_file(UnloadedRoom ^roomToLoad)
     room->StateSaving = thisroom.IsPersistent;
 	room->BottomEdgeY = thisroom.Edges.Bottom;
 	room->LeftEdgeX = thisroom.Edges.Left;
-    room->MusicVolumeAdjustment = (AGS::Types::RoomVolumeAdjustment)thisroom.options[ST_VOLUME];
+    room->MusicVolumeAdjustment = (AGS::Types::RoomVolumeAdjustment)thisroom.Options[kRoomBaseOpt_MusicVolume];
 	room->PlayerCharacterView = thisroom.Options[kRoomBaseOpt_PlayerCharacterView];
 	room->PlayMusicOnRoomLoad = thisroom.Options[kRoomBaseOpt_StartUpMusic];
 	room->RightEdgeX = thisroom.Edges.Right;
@@ -4628,8 +4627,7 @@ AGS::Types::Room^ load_crm_file(UnloadedRoom ^roomToLoad)
 
 void save_crm_file(Room ^room)
 {
-    thisroom.freemessage();
-    thisroom.freescripts();
+    thisroom.Free();
 
 	thisroom.GameId = room->GameID;
 	thisroom.Edges.Bottom = room->BottomEdgeY;
@@ -4649,7 +4647,7 @@ void save_crm_file(Room ^room)
 	thisroom.BkgSceneCount = room->BackgroundCount;
 
 	thisroom.MessageCount = room->Messages->Count;
-	for (int i = 0; i < thisroom.nummes; i++) 
+	for (int i = 0; i < thisroom.MessageCount; i++) 
 	{
 		RoomMessage ^newMessage = room->Messages[i];
 		//thisroom.Messages[i] = (char*)malloc(newMessage->Text->Length + 1);
@@ -4670,7 +4668,7 @@ void save_crm_file(Room ^room)
 
 	thisroom.ObjectCount = room->Objects->Count;
     thisroom.Objects.SetLength(room->Objects->Count);
-	for (int i = 0; i < thisroom.numsprs; i++)
+	for (int i = 0; i < thisroom.ObjectCount; i++)
 	{
 		RoomObject ^obj = room->Objects[i];
 		ConvertStringToNativeString(obj->Name, thisroom.Objects[i].ScriptName);
@@ -4691,10 +4689,6 @@ void save_crm_file(Room ^room)
     copy_walkareas_to_native(room);
     copy_walkbehind_to_native(room);
     copy_regions_to_native(room);
-        if (thisroom.hotspotnames[i])
-        {
-            free(thisroom.hotspotnames[i]);
-        }
 
 	CompileCustomProperties(room->Properties, &thisroom.Properties);
 
@@ -4711,7 +4705,7 @@ void save_crm_file(Room ^room)
 
 	TempDataStorage::RoomBeingSaved = nullptr;
 
-	for (int i = 0; i < thisroom.numhotspots; i++) 
+	for (int i = 0; i < thisroom.HotspotCount; i++) 
 	{
 		thisroom.Hotspots[i].Name.Free();
 	}
@@ -4806,9 +4800,8 @@ void serialize_room_interactions(Stream *ooo)
 
 void WriteGameSetupStructBase_Aligned(Stream *out)
 {
-    GameSetupStructBase *gameBase = (GameSetupStructBase *)&thisgame;
     AlignedStream align_s(out, Common::kAligned_Write);
-    gameBase->WriteToFile(&align_s);
+    thisgame.WriteBaseToFile(&align_s);
 }
 
 void save_thisgame_to_file(const char *fileName, Game ^game)
@@ -5026,10 +5019,10 @@ void save_game_to_dta_file(Game^ game, const char *fileName)
 	thisgame.Options[OPT_NOSCALEFNT] = game->Settings->FontsForHiRes;
 	ConvertStringToNativeString(game->Settings->GameName, thisgame.GameName, 50);
 	thisgame.Options[OPT_NEWGUIALPHA] = (int)game->Settings->GUIAlphaStyle;
-    thisgame.options[OPT_SPRITEALPHA] = (int)game->Settings->SpriteAlphaStyle;
+    thisgame.Options[OPT_SPRITEALPHA] = (int)game->Settings->SpriteAlphaStyle;
 	thisgame.Options[OPT_HANDLEINVCLICKS] = game->Settings->HandleInvClicksInScript;
 	thisgame.Options[OPT_FIXEDINVCURSOR] = !game->Settings->InventoryCursors;
-	thisgame.options[OPT_GLOBALTALKANIMSPD] = game->Settings->UseGlobalSpeechAnimationDelay ?
+	thisgame.Options[OPT_GLOBALTALKANIMSPD] = game->Settings->UseGlobalSpeechAnimationDelay ?
         game->Settings->GlobalSpeechAnimationDelay : (-game->Settings->GlobalSpeechAnimationDelay - 1);
         thisgame.Options[OPT_LEFTTORIGHTEVAL] = game->Settings->LeftToRightPrecedence;
 	thisgame.Options[OPT_LETTERBOX] = game->Settings->LetterboxMode;
