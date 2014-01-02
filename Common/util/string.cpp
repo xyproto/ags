@@ -115,7 +115,7 @@ void String::ReadCount(Stream *in, int count)
     {
         if (MustReserve(count))
         {
-            ReserveAndShift(-1, count - GetLength());
+            ReserveAndShift(-1, Math::Surplus(count, GetLength()));
         }
         count = in->Read(_meta->CStr, count);
         _meta->CStr[count] = 0;
@@ -402,7 +402,7 @@ void String::Reserve(int max_length)
 {
     if (MustReserve(max_length))
     {
-        ReserveAndShift(-1, max_length - GetLength());
+        ReserveAndShift(-1, Math::Surplus(max_length, GetLength()));
     }
 }
 
@@ -574,7 +574,7 @@ void String::FillString(char c, int count)
     {
         if (MustReserve(count))
         {
-            ReserveAndShift(-1, count - GetLength());
+            ReserveAndShift(-1, Math::Surplus(count, GetLength()));
         }
         memset(_meta->CStr, c, count);
         _meta->Length = count;
@@ -597,7 +597,7 @@ void String::Format(const char *fcstr, ...)
     {
         if (MustReserve(length))
         {
-            ReserveAndShift(-1, length - GetLength());
+            ReserveAndShift(-1, Math::Surplus(length, GetLength()));
         }
         va_start(argptr, fcstr);
         vsprintf(_meta->CStr, fcstr, argptr);
@@ -740,7 +740,7 @@ void String::SetString(const char *cstr, int length)
         {
             if (MustReserve(length))
             {
-                ReserveAndShift(-1, length - GetLength());
+                ReserveAndShift(-1, Math::Surplus(length, GetLength()));
             }
             memcpy(_meta->CStr, cstr, length);
             _meta->Length = length;

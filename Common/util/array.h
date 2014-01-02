@@ -213,7 +213,7 @@ public:
         {
             if (MustReserve(count))
             {
-                ReserveAndShift(-1, count - GetCount());
+                ReserveAndShift(-1, Math::Surplus(count, GetCount()));
             }
             count = in->ReadArray(_meta->Arr, sizeof(T), count);
              _meta->Length = count;
@@ -267,7 +267,7 @@ public:
     {
         if (MustReserve(max_length))
         {
-            ReserveAndShift(-1, max_length - GetCount());
+            ReserveAndShift(-1, Math::Surplus(max_length, GetCount()));
         }
     }
     // Ensure array has at least space to store N additional chars
@@ -364,7 +364,7 @@ public:
         {
             if (MustReserve(count))
             {
-                ReserveAndShift(-1, count - GetCount());
+                ReserveAndShift(-1, Math::Surplus(count, GetCount()));
             }
             else if (_meta->RefCount > 1)
             {
@@ -386,7 +386,7 @@ public:
         {
             if (MustReserve(count))
             {
-                ReserveAndShift(-1, count - GetCount());
+                ReserveAndShift(-1, Math::Surplus(count, GetCount()));
             }
             else if (_meta->RefCount > 1)
             {
@@ -762,7 +762,7 @@ public:
     {
         if (MustReserve(max_length))
         {
-            ReserveAndShift(-1, max_length - GetCount());
+            ReserveAndShift(-1, Math::Surplus(max_length, GetCount()));
         }
     }
     // Ensure array has at least space to store N additional chars
@@ -860,7 +860,7 @@ public:
         {
             if (MustReserve(count))
             {
-                ReserveAndShift(-1, count - GetCount());
+                ReserveAndShift(-1, Math::Surplus(count, GetCount()));
             }
             else if (_meta->RefCount > 1)
             {
@@ -891,7 +891,7 @@ public:
         {
             if (MustReserve(count))
             {
-                ReserveAndShift(-1, count - GetCount());
+                ReserveAndShift(-1, Math::Surplus(count, GetCount()));
                 Construct(_meta->Length, count, &value);
             }
             else if (_meta->RefCount > 1)

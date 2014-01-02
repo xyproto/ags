@@ -61,6 +61,11 @@ namespace Math
         length = Min<T>(length, height - from);
     }
 
+    template <class T>
+    inline T Surplus(T larger, T smaller)
+    {
+        return larger > smaller ? larger - smaller : 0;
+    }
 
 } // namespace Math
 
