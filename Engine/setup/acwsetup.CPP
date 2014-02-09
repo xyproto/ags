@@ -44,13 +44,14 @@ int curscrn=-1,csendto,curdigi=0,curmidi=0,windowed=0,useletterbox = 0;
 int defaultRes = -1, mustBeLetterbox = 0, gameColDep = 0;
 int refresh = 0, antialias = 0, reduce32to16 = 0;
 int sideBorders = 1;
-char curtranslation[200] = "", curreplay[200] = "";
+char curtranslation[200] = "";
 char curdatadir[MAX_PATH] = ".";
 char curFilter[100] = "";
 char curGfxDriver[100] = "";
 char gameNameForTitleBar[200] = "";
 int curmaxcache = 1024 * 20, curusespeech = 1;
 int wwidth, wheight;
+int base_height;
 GFXFilter **filterList = NULL;
 const int specialFilterListIndex = 1;
 const char *specialFilterName = "Max nearest-neighbour filter";
@@ -131,63 +132,6 @@ void update_resolution_texts(HWND hDlg) {
   }
   sprintf(buffer, "Resolution: %d""x%d", thisx, thisy);
   SendDlgItemMessage (hDlg, IDC_RESOLUTION, WM_SETTEXT, 0, (LPARAM)buffer);
-}
-
-void get_replay_name (const char *filename, char *namebuf) {
-  Stream *in = Common::File::OpenFileRead(filename);
-  if (in == NULL)
-    return;
-
-  char buffer [100];
-  in->Read (buffer, 12);
-  buffer[12] = 0;
-  if (strcmp (buffer, "AGSRecording") != 0) {
-    delete in;
-    return;
-  }
-
-  fgetstring_limit (buffer, in, 12);
-  if (buffer[0] != '2')  {
-    // very first alpha version, can't play it
-    delete in;
-    return;
-  }
-  int replayver = in->ReadInt32();
-
-  if ((replayver < 1) || (replayver > 3)) {
-    delete in;
-    return;
-  }
-
-  namebuf[0] = 0;
-  if (strcmp (buffer, enginever))
-    strcpy (namebuf, "!! ");
-
-  if (replayver == 1) {
-    // first version didn't save info
-    strcat (namebuf, "(unknown replay)");
-    delete in;
-    return;
-  }
-
-  fgetstring_limit (buffer, in, 99);
-  // skip the UID
-  in->ReadInt32 ();
-  strcat (namebuf, buffer);
-  strcat (namebuf, " (");
-  // skip the total time
-  int tottime = in->ReadInt32 ();
-  sprintf (&namebuf[strlen(namebuf)], "%02d:%02d:%02d)", tottime / 3600, (tottime % 3600) / 60, tottime % 60);
-  // replay description, maybe we'll use this later
-  fgetstring_limit (buffer, in, 99);
-
-  if (buffer[0] == 0)
-    strcpy (buffer, "No description");
-
-  strcat (namebuf, ": ");
-  strcat (namebuf, buffer);
-  delete in;
-
 }
 
 void retrieve_filter_list(bool isD3D)
@@ -345,37 +289,6 @@ void InitializeDialog(HWND hDlg) {
     
   SendDlgItemMessage(hDlg,IDC_COMBO4,CB_SETCURSEL,idx,0);
 
-  SendDlgItemMessage(hDlg,IDC_REPLAYBOX,CB_ADDSTRING,0,(LPARAM)"Don't run a replay");
-  SendDlgItemMessage(hDlg,IDC_REPLAYBOX,CB_SETCURSEL,0,0);
-  idx = 1;
-  // Find and add all replays in folder
-  if ((hFile = _findfirst( "*.agr", &c_file )) != -1L ) {
-    do {
-      if (c_file.name[strlen(c_file.name)-4] == '.') {
-        // it actually returns *.agr* so make sure it's a .AGR file,
-        // then add to our list
-        char listentry[300] = "(unknown replay)";
-        get_replay_name (c_file.name, listentry);
-        strcat (listentry, " (File: ");
-        strcat (listentry, c_file.name);
-        strcat (listentry, ")");
-
-        int needToSet = 0;
-        // if this is the translation we're using, set it
-        if (stricmp (curreplay, c_file.name) == 0)
-          needToSet = 1;
-        
-        SendDlgItemMessage(hDlg,IDC_REPLAYBOX,CB_ADDSTRING,0,(LPARAM)listentry);
-
-        if (needToSet)
-          SendDlgItemMessage (hDlg, IDC_REPLAYBOX, CB_SETCURSEL, idx, 0);
-        idx++;
-      }
-    } while( _findnext( hFile, &c_file ) == 0 );
-
-    _findclose( hFile );
-  }
-
   populate_drop_down_with_filters(hDlg);
 
   if (stricmp(curGfxDriver, "D3D9") == 0)
@@ -404,9 +317,6 @@ void InitializeDialog(HWND hDlg) {
   // If the game is 320x240, don't let them un-tick it
   if (mustBeLetterbox)
     EnableWindow (GetDlgItem (hDlg, IDC_LETTERBOX), FALSE);
-  // If it's 800x600, hide the letterbox option
-  if (defaultRes >= 5)
-    ShowWindow (GetDlgItem (hDlg, IDC_LETTERBOX), SW_HIDE);
 
   // If the game isn't 32-bit, disable it
   if (gameColDep < 32)
@@ -432,7 +342,8 @@ void InitializeDialog(HWND hDlg) {
   wwidth = winsize.right - winsize.left;
   wheight = winsize.bottom - winsize.top;
 
-  MoveWindow (hDlg, winsize.left, winsize.top, wwidth, wheight-175, TRUE);
+  base_height = MulDiv(112, HIWORD(GetDialogBaseUnits()), 8);
+  MoveWindow (hDlg, max(0, winsize.left), max(0, winsize.top + (wheight - base_height) / 2), wwidth, base_height, TRUE);
   update_resolution_texts (hDlg);
 
   SendMessage(hDlg, WM_SETTEXT, NULL, (LPARAM)gameNameForTitleBar);
@@ -461,9 +372,17 @@ LRESULT CALLBACK callback_settings(HWND hDlg, UINT message, WPARAM wParam, LPARA
         ShowWindow (GetDlgItem(hDlg, IDC_STATICADV), SW_SHOW);
         ShowWindow (GetDlgItem(hDlg, IDC_STATICADV2), SW_SHOW);
         ShowWindow (GetDlgItem(hDlg, IDC_STATICADV3), SW_SHOW);
+        ShowWindow (GetDlgItem(hDlg, IDC_COMBO1), SW_SHOW);
+        ShowWindow (GetDlgItem(hDlg, IDC_COMBO2), SW_SHOW);
+        ShowWindow (GetDlgItem(hDlg, IDC_SPEECHPACK), SW_SHOW);
+        ShowWindow (GetDlgItem(hDlg, IDC_REFRESH), SW_SHOW);
+        ShowWindow (GetDlgItem(hDlg, IDC_SIDEBORDERS), SW_SHOW);
+        ShowWindow (GetDlgItem(hDlg, IDC_ANTIALIAS), SW_SHOW);
+        ShowWindow (GetDlgItem(hDlg, IDC_REDUCESPR), SW_SHOW);
+        ShowWindow (GetDlgItem(hDlg, IDC_LETTERBOX), SW_SHOW);
         ShowWindow (GetDlgItem(hDlg, IDC_COMBO4), SW_SHOW);
 
-        MoveWindow (hDlg, winsize.left, winsize.top, wwidth, wheight, TRUE);
+        MoveWindow (hDlg, max(0, winsize.left), max(0, winsize.top - (wheight - base_height) / 2), wwidth, wheight, TRUE);
         //SetActiveWindow (GetDlgItem(hDlg, IDOK));
         SetFocus (GetDlgItem(hDlg, IDOK));
       }
@@ -537,24 +456,10 @@ LRESULT CALLBACK callback_settings(HWND hDlg, UINT message, WPARAM wParam, LPARA
             strstr (curtranslation, " translation")[0] = 0;
           }
           else
-            curreplay[0] = 0;
+            curtranslation[0] = 0;
 
           WritePrivateProfileString ("language", "translation",
               (idx == 0) ? NULL : curtranslation, ac_config_file);
-
-          idx = SendDlgItemMessage(hDlg,IDC_REPLAYBOX,CB_GETCURSEL,0,0);
-          if (idx > 0) {
-            SendDlgItemMessage(hDlg,IDC_REPLAYBOX,CB_GETLBTEXT,idx,(LPARAM)curreplay);
-            // cut the end bracket off
-            curreplay[strlen(curreplay)-1] = 0;
-            // get the filename
-            char *fnptr = &strstr (curreplay, "File: ")[6];
-            memmove (curreplay, fnptr, strlen (fnptr) + 1);
-          }
-          else
-            curtranslation[0] = 0;
-          WritePrivateProfileString ("misc", "replay",
-              (idx == 0) ? NULL : curreplay, ac_config_file);
 
           idx = SendDlgItemMessage(hDlg,IDC_COMBO4,CB_GETCURSEL,0,0);
           SendDlgItemMessage(hDlg,IDC_COMBO4,CB_GETLBTEXT,idx,(LPARAM)tbuf);
@@ -675,7 +580,6 @@ int acwsetup(const char*vername, const char*enbuild) {
       curusespeech = 1;
 
     GetPrivateProfileString("language", "translation", "", curtranslation, 200, ac_config_file);
-    GetPrivateProfileString("misc", "replay", "", curreplay, 200, ac_config_file);
     GetPrivateProfileString("misc", "datadir", ".", curdatadir, 255, ac_config_file);
     GetPrivateProfileString("misc", "gfxfilter", "None", curFilter, 100, ac_config_file);
     GetPrivateProfileString("misc", "gfxdriver", "D3D9", curGfxDriver, 100, ac_config_file);

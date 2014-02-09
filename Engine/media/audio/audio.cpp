@@ -40,6 +40,8 @@ extern CharacterInfo*playerchar;
 
 extern int psp_is_old_datafile;
 
+extern volatile int switching_away_from_game;
+
 #if !defined(IOS_VERSION) && !defined(PSP_VERSION) && !defined(ANDROID_VERSION)
 volatile int psp_audio_multithreaded = 0;
 #endif
@@ -855,8 +857,24 @@ void apply_volume_drop_modifier(bool applyModifier)
 extern volatile char want_exit;
 extern int frames_per_second;
 
+void update_mp3_thread()
+{
+	while (switching_away_from_game) { }
+	AGS::Engine::MutexLock _lock(_audio_mutex);
+	for (musicPollIterator = 0; musicPollIterator <= MAX_SOUND_CHANNELS; ++musicPollIterator)
+	{
+		if ((channels[musicPollIterator] != NULL) && (channels[musicPollIterator]->done == 0))
+			channels[musicPollIterator]->poll();
+	}
+}
+
+void update_mp3()
+{
+	if (!psp_audio_multithreaded) update_mp3_thread();
+}
+
 void update_polled_mp3() {
-    UPDATE_MP3
+    update_mp3();
 
         if (mvolcounter > update_music_at) {
             update_music_volume();
@@ -869,11 +887,11 @@ void update_polled_mp3() {
 
 // Update the music, and advance the crossfade on a step
 // (this should only be called once per game loop)
-void update_polled_audio_and_crossfade () {
-   
-  update_polled_stuff_if_runtime ();
+void update_polled_audio_and_crossfade ()
+{
+	update_polled_stuff_if_runtime ();
 
-    _audio_mutex.Lock();
+	AGS::Engine::MutexLock _lock(_audio_mutex);
 
     _audio_doing_crossfade = true;
 
@@ -909,7 +927,6 @@ void update_polled_audio_and_crossfade () {
 
     _audio_doing_crossfade = false;
 
-    _audio_mutex.Unlock();
 }
 
 

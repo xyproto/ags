@@ -697,7 +697,7 @@ void UpdateGameOnce(bool checkControls, IDriverDependantBitmap *extraBitmap, int
 
     int res;
 
-    UPDATE_MP3
+    update_mp3();
 
     numEventsAtStartOfFunction = numevents;
 

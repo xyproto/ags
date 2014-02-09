@@ -201,7 +201,7 @@ int run_interaction_script(InteractionScripts *nint, int evnt, int chkAny, int i
 
     RuntimeScriptValue rval_null;
 
-    UPDATE_MP3
+    update_mp3();
         if ((strstr(evblockbasename,"character")!=0) || (strstr(evblockbasename,"inventory")!=0)) {
             // Character or Inventory (global script)
             if (inside_script) 
@@ -218,7 +218,7 @@ int run_interaction_script(InteractionScripts *nint, int evnt, int chkAny, int i
             else
                 roominst->RunTextScript(nint->scriptFuncNames[evnt]);
         }
-        UPDATE_MP3
+        update_mp3();
 
             int retval = 0;
         // if the room changed within the action
@@ -434,7 +434,7 @@ int run_interaction_commandlist (NewInteractionCommandList *nicl, int *timesrun,
           { 
               TempEip tempip(4001);
               RuntimeScriptValue rval_null;
-              UPDATE_MP3
+              update_mp3();
                   if ((strstr(evblockbasename,"character")!=0) || (strstr(evblockbasename,"inventory")!=0)) {
                       // Character or Inventory (global script)
                       char *torun = make_ts_func_name(evblockbasename,evblocknum,nicl->command[i].data[0].val);
@@ -454,7 +454,7 @@ int run_interaction_commandlist (NewInteractionCommandList *nicl, int *timesrun,
                       else
                           roominst->RunTextScript(make_ts_func_name(evblockbasename,evblocknum,nicl->command[i].data[0].val));
                   }
-                  UPDATE_MP3
+                  update_mp3();
                       break;
           }
       case 2:  // Add score (first time)
