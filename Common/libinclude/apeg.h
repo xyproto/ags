@@ -37,7 +37,7 @@ typedef struct APEG_AUDIO_INF {
 } APEG_AUDIO_INF;
 
 typedef struct APEG_STREAM {
-	BITMAP *bitmap;
+	ALLEGRO_BITMAP*bitmap;
 	int frame_updated;
 	unsigned int frame;
 
@@ -83,13 +83,13 @@ int apeg_advance_stream(APEG_STREAM *stream, int loop);
 int apeg_reset_stream(APEG_STREAM *stream);
 void apeg_close_stream(APEG_STREAM *stream);
 
-int apeg_play_mpg(const char *filename, BITMAP *target, int loop,
+int apeg_play_mpg(const char *filename, ALLEGRO_BITMAP*target, int loop,
                   int (*callback)(void));
-int apeg_play_memory_mpg(void *buffer, BITMAP *target, int loop,
+int apeg_play_memory_mpg(void *buffer, ALLEGRO_BITMAP*target, int loop,
                          int (*callback)(BITMAP*));
-int apeg_play_mpg_ex(void *ptr, BITMAP *target, int loop,
+int apeg_play_mpg_ex(void *ptr, ALLEGRO_BITMAP*target, int loop,
                      int (*callback)(BITMAP*));
-int apeg_play_apeg_stream(APEG_STREAM *stream_to_play, BITMAP *bmp, int loop, int (*callback)(BITMAP*tempBuffer));
+int apeg_play_apeg_stream(APEG_STREAM *stream_to_play, ALLEGRO_BITMAP*bmp, int loop, int (*callback)(BITMAP*tempBuffer));
 
 int apeg_ignore_video(int ignore);
 int apeg_ignore_audio(int ignore);

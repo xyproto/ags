@@ -69,7 +69,7 @@ struct ALFONT_FONT {
 
 
 /* global vars */
-BITMAP *default_bmp; //Draw Font on default BITMAP;
+ALLEGRO_BITMAP *default_bmp; //Draw Font on default BITMAP;
 static FT_Library ft_library;
 static int alfont_textmode = 0;
 static int alfont_inited = 0;
@@ -696,11 +696,11 @@ void alfont_destroy_font(ALFONT_FONT *f) {
 }
 
 
-void alfont_textout_aa(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
+void alfont_textout_aa(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
   alfont_textout_aa_ex(bmp, f, s, x, y, color, alfont_textmode);
 }
 
-void alfont_textout_aa_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
+void alfont_textout_aa_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
   char *lpszW;
   char *lpszW_tmp;
   int x_tmp;
@@ -717,7 +717,7 @@ void alfont_textout_aa_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int
   int first_x=0, final_x=0, final_y=0;
   int curr_uformat;
   int first_flag=TRUE; //First Char flag
-  BITMAP *masked_bmp; //the masked bmp used by Font hollow
+  ALLEGRO_BITMAP *masked_bmp; //the masked bmp used by Font hollow
 
   #ifdef ALFONT_DOS
   iconv_t c_pt;
@@ -1860,12 +1860,12 @@ void alfont_textout_aa_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int
 }
 
 
-void alfont_textout(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
+void alfont_textout(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
   alfont_textout_ex(bmp, f, s, x, y, color, alfont_textmode);
 }
 
 
-void alfont_textout_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
+void alfont_textout_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
   char *lpszW;
   char *lpszW_tmp;
   int x_tmp;
@@ -1880,7 +1880,7 @@ void alfont_textout_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y,
   int first_x=0, final_x=0, final_y=0;
   int curr_uformat;
   int first_flag=TRUE; //First Char flag
-  BITMAP *masked_bmp; //the masked bmp used by Font hollow
+  ALLEGRO_BITMAP *masked_bmp; //the masked bmp used by Font hollow
   #ifdef ALFONT_DOS
   iconv_t c_pt;
   size_t fromlen, tolen;
@@ -4682,51 +4682,51 @@ int alfont_need_uconvert(ALFONT_FONT *f, const char *str) {
 }
 
 
-void alfont_textout_centre_aa(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
+void alfont_textout_centre_aa(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
   alfont_textout_centre_aa_ex(bmp, f, s, x, y, color, alfont_textmode);
 }
 
 
-void alfont_textout_centre_aa_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
+void alfont_textout_centre_aa_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
   x -= alfont_text_length(f, s) / 2;
   alfont_textout_aa_ex(bmp, f, s, x, y, color, backg);
 }
 
 
-void alfont_textout_centre(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
+void alfont_textout_centre(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
   alfont_textout_centre_ex(bmp, f, s, x, y, color, alfont_textmode);
 }
 
 
-void alfont_textout_centre_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
+void alfont_textout_centre_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
   x -= alfont_text_length(f, s) / 2;
   alfont_textout_ex(bmp, f, s, x, y, color, backg);
 }
 
 
-void alfont_textout_right_aa(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
+void alfont_textout_right_aa(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
   alfont_textout_right_aa_ex(bmp, f, s, x, y, color, alfont_textmode);
 }
 
 
-void alfont_textout_right_aa_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
+void alfont_textout_right_aa_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
   x -= alfont_text_length(f, s);
   alfont_textout_aa_ex(bmp, f, s, x, y, color, backg);
 }
 
 
-void alfont_textout_right(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
+void alfont_textout_right(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color) {
   alfont_textout_right_ex(bmp, f, s, x, y, color, alfont_textmode);
 }
 
 
-void alfont_textout_right_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
+void alfont_textout_right_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int backg) {
   x -= alfont_text_length(f, s);
   alfont_textout_ex(bmp, f, s, x, y, color, backg);
 }
 
 
-void alfont_textprintf(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
+void alfont_textprintf(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4739,7 +4739,7 @@ void alfont_textprintf(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, con
 }
 
 
-void alfont_textprintf_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
+void alfont_textprintf_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4752,7 +4752,7 @@ void alfont_textprintf_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, 
 }
 
 
-void alfont_textprintf_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
+void alfont_textprintf_aa(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4765,7 +4765,7 @@ void alfont_textprintf_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, 
 }
 
 
-void alfont_textprintf_aa_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
+void alfont_textprintf_aa_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4778,7 +4778,7 @@ void alfont_textprintf_aa_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int colo
 }
 
 
-void alfont_textprintf_centre(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
+void alfont_textprintf_centre(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4791,7 +4791,7 @@ void alfont_textprintf_centre(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int col
 }
 
 
-void alfont_textprintf_centre_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
+void alfont_textprintf_centre_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4804,7 +4804,7 @@ void alfont_textprintf_centre_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int 
 }
 
 
-void alfont_textprintf_centre_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
+void alfont_textprintf_centre_aa(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4817,7 +4817,7 @@ void alfont_textprintf_centre_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int 
 }
 
 
-void alfont_textprintf_centre_aa_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
+void alfont_textprintf_centre_aa_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4830,7 +4830,7 @@ void alfont_textprintf_centre_aa_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, i
 }
 
 
-void alfont_textprintf_right(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
+void alfont_textprintf_right(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4843,7 +4843,7 @@ void alfont_textprintf_right(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int colo
 }
 
 
-void alfont_textprintf_right_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
+void alfont_textprintf_right_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4856,7 +4856,7 @@ void alfont_textprintf_right_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int c
 }
 
 
-void alfont_textprintf_right_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
+void alfont_textprintf_right_aa(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...) {
   char buf[512];
 
   va_list ap;
@@ -4869,7 +4869,7 @@ void alfont_textprintf_right_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int c
 }
 
 
-void alfont_textprintf_right_aa_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
+void alfont_textprintf_right_aa_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int backg, const char *format, ...) {
   char buf[512];
 
   va_list ap;

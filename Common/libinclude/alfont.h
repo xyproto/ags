@@ -63,35 +63,35 @@ ALFONT_DLL_DECLSPEC int alfont_get_font_height(ALFONT_FONT *f);
 
 ALFONT_DLL_DECLSPEC int alfont_text_mode(int mode);
 
-ALFONT_DLL_DECLSPEC void alfont_textout_aa(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
-ALFONT_DLL_DECLSPEC void alfont_textout(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
-ALFONT_DLL_DECLSPEC void alfont_textout_aa_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
-ALFONT_DLL_DECLSPEC void alfont_textout_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
+ALFONT_DLL_DECLSPEC void alfont_textout_aa(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
+ALFONT_DLL_DECLSPEC void alfont_textout(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
+ALFONT_DLL_DECLSPEC void alfont_textout_aa_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
+ALFONT_DLL_DECLSPEC void alfont_textout_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
 
-ALFONT_DLL_DECLSPEC void alfont_textout_centre_aa(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
-ALFONT_DLL_DECLSPEC void alfont_textout_centre(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
-ALFONT_DLL_DECLSPEC void alfont_textout_centre_aa_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
-ALFONT_DLL_DECLSPEC void alfont_textout_centre_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
+ALFONT_DLL_DECLSPEC void alfont_textout_centre_aa(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
+ALFONT_DLL_DECLSPEC void alfont_textout_centre(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
+ALFONT_DLL_DECLSPEC void alfont_textout_centre_aa_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
+ALFONT_DLL_DECLSPEC void alfont_textout_centre_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
 
-ALFONT_DLL_DECLSPEC void alfont_textout_right_aa(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
-ALFONT_DLL_DECLSPEC void alfont_textout_right(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
-ALFONT_DLL_DECLSPEC void alfont_textout_right_aa_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
-ALFONT_DLL_DECLSPEC void alfont_textout_right_ex(BITMAP *bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
+ALFONT_DLL_DECLSPEC void alfont_textout_right_aa(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
+ALFONT_DLL_DECLSPEC void alfont_textout_right(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color);
+ALFONT_DLL_DECLSPEC void alfont_textout_right_aa_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
+ALFONT_DLL_DECLSPEC void alfont_textout_right_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, const char *s, int x, int y, int color, int bg);
 
-ALFONT_DLL_DECLSPEC void alfont_textprintf(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_aa_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_aa(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_aa_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
 
-ALFONT_DLL_DECLSPEC void alfont_textprintf_centre(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_centre_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_centre_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_centre_aa_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_centre(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_centre_aa(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_centre_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_centre_aa_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
 
-ALFONT_DLL_DECLSPEC void alfont_textprintf_right(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_right_aa(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_right_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
-ALFONT_DLL_DECLSPEC void alfont_textprintf_right_aa_ex(BITMAP *bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_right(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_right_aa(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_right_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
+ALFONT_DLL_DECLSPEC void alfont_textprintf_right_aa_ex(ALLEGRO_BITMAP*bmp, ALFONT_FONT *f, int x, int y, int color, int bg, const char *format, ...);
 
 ALFONT_DLL_DECLSPEC int alfont_text_height(ALFONT_FONT *f);
 ALFONT_DLL_DECLSPEC int alfont_text_length(ALFONT_FONT *f, const char *str);
