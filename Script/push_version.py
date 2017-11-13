@@ -32,7 +32,7 @@ def replace_group(match, group, data, replacement):
 
 def main():
 
-    version = load_version("../version.json")
+    version = load_version("version.json")
 
     # -----------------------------------------------------------------------------
 

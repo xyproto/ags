@@ -21,8 +21,8 @@ SCRIPT_LOC=os.path.dirname(os.path.realpath(__file__))
 WORKSPACE_DIR=os.path.join(SCRIPT_LOC, "..")
 
 def workspace_dir():
-    assert os.path.exists(os.path.join(WORKSPACE_DIR, "version.json"))
-    assert os.path.exists(os.path.join(WORKSPACE_DIR, "Copyright.txt"))
+    assert os.path.exists(os.path.join(WORKSPACE_DIR, "Script", "version.json"))
+    assert os.path.exists(os.path.join(WORKSPACE_DIR, "Script", "Copyright.txt"))
     return WORKSPACE_DIR
 
 def workspace_rel(path):

@@ -6,7 +6,7 @@ Originally created by Chris Jones back in 1999, AGS was opensourced in 2011 and 
 
 An official homepage of AGS is: http://www.adventuregamestudio.co.uk
 
-Both Editor and Engine are licensed under the Artistic License 2.0; for more details see [License.txt](License.txt).
+Both Editor and Engine are licensed under the Artistic License 2.0; for more details see [LICENSE](LICENSE).
 
 
 ## Engine instructions

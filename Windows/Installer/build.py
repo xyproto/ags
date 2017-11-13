@@ -24,13 +24,13 @@ def main():
     shutil.copy2(workspace_rel("Changes.txt"), docs_dir)
 
     editor_ver = get_editor_version_number(workspace_rel("Windows/Installer/Source/AGSEditor.exe"))
-    project_ver = load_project_version(workspace_rel("version.json"))
+    project_ver = load_project_version(workspace_rel("Script/version.json"))
 
     editor_ver_check = ".".join(str(x) for x in editor_ver)
     project_ver_check = ".".join(project_ver.version)
 
     if project_ver_check != editor_ver_check:
-        raise Exception("Versions differ - editor:{0} version.json:{1}".format(editor_ver_check, project_ver_check))
+        raise Exception("Versions differ - editor:{0} Script/version.json:{1}".format(editor_ver_check, project_ver_check))
 
     project_titlever_str = ".".join(project_ver.version_friendly)
     project_fullver_str = ".".join(project_ver.version)
