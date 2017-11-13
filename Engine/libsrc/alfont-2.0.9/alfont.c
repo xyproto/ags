@@ -17,6 +17,11 @@
 #include <alfont.h>
 #include <ft2build.h>
 
+#ifndef TRUE
+  #define TRUE -1
+  #define FALSE 0
+#endif
+
 #ifdef ALFONT_DOS	//run in DOS
 #include <iconv.h>
 #else			//run in Other
@@ -822,6 +827,7 @@ void alfont_textout_aa_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, in
 		}
 
 		setlocale(LC_CTYPE,f->language);
+#define U_UNICODE       AL_ID('U','N','I','C')
 		set_uformat(U_UNICODE);
 
 		lpszW = (char *)malloc(nLen*sizeof(wchar_t));
@@ -933,14 +939,20 @@ void alfont_textout_aa_ex(ALLEGRO_BITMAP *bmp, ALFONT_FONT *f, const char *s, in
     lpszW = (char *)s_pointer;
   }
 
+  int bmpcl = 0;
+  int bmpct = 0;
+  int bmpcr = 0;
+  int bmpcb = 0;
+  al_get_clipping_rectangle(&bmpcl, &bmpct, &bmpcr, &bmpcb);
+
   /* is it under or over or too far to the right of the clipping rect then
      we can assume the string is clipped */
-  if ((y + f->face_h < bmp->ct) || (y > bmp->cb) || (x > bmp->cr))
+  if ((y + f->face_h < bmpct) || (y > bmpcb) || (x > bmpcr))
     return;
 
   //build transparency
   if (f->transparency!=255) {
-	  if (bitmap_color_depth(bmp)>8) {
+	  if (al_get_bitmap_depth(bmp)>8) {
 		drawing_mode(DRAW_MODE_TRANS,NULL,0,0);
 		set_preservedalpha_trans_blender(0,0,0,f->transparency);
 	  }

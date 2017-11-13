@@ -18,6 +18,11 @@
 #ifndef __AGS_CN_CORE__TYPES_H
 #define __AGS_CN_CORE__TYPES_H
 
+#ifndef TRUE
+   #define TRUE         -1
+   #define FALSE        0
+#endif
+
 #include "endianness.h"
 
 #if defined (_WINDOWS) && !defined (WINDOWS_VERSION)
